@@ -8,6 +8,10 @@ using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Net;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.RegularExpressions;
+using System.Web.Script.Serialization;
 using System.Threading;
 using System.Windows.Forms;
 
@@ -36,13 +40,29 @@ namespace C3
         readonly Button startButton = new Button();
         readonly Button redirectOnButton = new Button();
         readonly Button redirectOffButton = new Button();
+        readonly ComboBox pcBox = new ComboBox();
+        readonly Button addPcButton = new Button();
+        readonly Button removePcButton = new Button();
+        readonly List<Pc> pcs = new List<Pc>();
+        Pc pcToRemove;
         readonly Label statusLabel = new Label();
         readonly TextBox log = new TextBox();
 
         readonly List<Device> devices = new List<Device>();
         readonly string configPath;
         readonly string devicesPath;
+        readonly string pcsPath;
         string adbPath;
+
+        class Pc
+        {
+            public string Name;
+            public string Uuid;
+            public string AppId;
+            public string AppName;
+            public override string ToString() { return Name + "  –  " + AppName; }
+            public string Serialize() { return Name + "|" + Uuid + "|" + AppId + "|" + AppName; }
+        }
 
         class Device
         {
@@ -57,10 +77,11 @@ namespace C3
             Directory.CreateDirectory(dir);
             configPath = Path.Combine(dir, "tv-ip.txt");
             devicesPath = Path.Combine(dir, "devices.txt");
+            pcsPath = Path.Combine(dir, "pcs.txt");
 
             Text = "C3 Updater";
             try { Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch { }
-            ClientSize = new Size(560, 550);
+            ClientSize = new Size(560, 640);
             FormBorderStyle = FormBorderStyle.FixedSingle;
             MaximizeBox = false;
             StartPosition = FormStartPosition.CenterScreen;
@@ -122,13 +143,32 @@ namespace C3
             redirectOffButton.Size = new Size(250, 34);
             redirectOffButton.Click += delegate { RunAsync(Job.RedirectOff); };
 
-            statusLabel.Location = new Point(22, 290);
+            // --- PCs for C3 Desktop
+            var pcLabel = new Label { Text = "PCs für C3 Desktop (Sunshine)", ForeColor = Muted, AutoSize = true, Location = new Point(22, 290) };
+            pcBox.Location = new Point(20, 314);
+            pcBox.Size = new Size(260, 28);
+            pcBox.DropDownStyle = ComboBoxStyle.DropDownList;
+            pcBox.FlatStyle = FlatStyle.Flat;
+            pcBox.BackColor = Panel;
+            pcBox.ForeColor = Fg;
+
+            StyleButton(addPcButton, "Diesen PC hinzufügen", false);
+            addPcButton.Location = new Point(290, 312);
+            addPcButton.Size = new Size(160, 32);
+            addPcButton.Click += delegate { RunAsync(Job.AddPc); };
+
+            StyleButton(removePcButton, "Entfernen", false);
+            removePcButton.Location = new Point(458, 312);
+            removePcButton.Size = new Size(82, 32);
+            removePcButton.Click += delegate { pcToRemove = pcBox.SelectedItem as Pc; RunAsync(Job.RemovePc); };
+
+            statusLabel.Location = new Point(22, 360);
             statusLabel.Size = new Size(520, 22);
             statusLabel.ForeColor = Muted;
             statusLabel.Text = "Bereit.";
 
-            log.Location = new Point(20, 316);
-            log.Size = new Size(520, 210);
+            log.Location = new Point(20, 386);
+            log.Size = new Size(520, 236);
             log.Multiline = true;
             log.ReadOnly = true;
             log.ScrollBars = ScrollBars.Vertical;
@@ -137,9 +177,10 @@ namespace C3
             log.BorderStyle = BorderStyle.None;
             log.Font = new Font("Consolas", 9f);
 
-            Controls.AddRange(new Control[] { title, deviceLabel, deviceBox, removeButton, nameLabel, nameBox, ipLabel, ipBox, saveButton, updateButton, startButton, redirectOnButton, redirectOffButton, statusLabel, log });
+            Controls.AddRange(new Control[] { title, deviceLabel, deviceBox, removeButton, nameLabel, nameBox, ipLabel, ipBox, saveButton, updateButton, startButton, redirectOnButton, redirectOffButton, pcLabel, pcBox, addPcButton, removePcButton, statusLabel, log });
             AcceptButton = updateButton;
             LoadDevices();
+            LoadPcs();
         }
 
         void StyleButton(Button b, string text, bool primary)
@@ -257,7 +298,7 @@ namespace C3
 
         // ------------------------------------------------------------------ workflow
 
-        enum Job { Update, Start, RedirectOn, RedirectOff }
+        enum Job { Update, Start, RedirectOn, RedirectOff, AddPc, RemovePc }
 
         void RunAsync(Job job)
         {
@@ -281,6 +322,8 @@ namespace C3
                         case Job.Start: DoStart(ip); break;
                         case Job.RedirectOn: DoRedirect(ip, true); break;
                         case Job.RedirectOff: DoRedirect(ip, false); break;
+                        case Job.AddPc: DoAddThisPc(ip); break;
+                        case Job.RemovePc: DoRemovePc(ip); break;
                     }
                 }
                 catch (Exception e)
@@ -323,6 +366,7 @@ namespace C3
             }
 
             Adb("-s " + serial + " shell am start -n " + MainActivity, 20000);
+            if (pcs.Count > 0) PushPcs(serial);
             string now = InstalledVersion(serial);
             Status("Fertig – C3 " + (now ?? "") + " ist installiert und gestartet.");
             Log("Fertig.");
@@ -385,6 +429,275 @@ namespace C3
             {
                 Status("Home-Taste öffnet wieder Amazon.");
             }
+        }
+
+        // ------------------------------------------------------------------ PCs (C3 Desktop)
+
+        /// Reads name + UUID from the local Sunshine (serverinfo) and computes the Sunshine
+        /// app id exactly like Sunshine does: abs((int32)crc32(name + sha256hex(image))).
+        void DoAddThisPc(string ip)
+        {
+            Status("Lese Sunshine auf diesem PC …");
+            string info = null;
+            try
+            {
+                using (var wc = new WebClient()) info = wc.DownloadString("http://localhost:47989/serverinfo");
+            }
+            catch (Exception e)
+            {
+                Log("Sunshine nicht erreichbar (" + e.Message + "). Läuft Sunshine auf diesem PC?");
+                Status("Sunshine nicht gefunden.");
+                return;
+            }
+            string uuid = XmlValue(info, "uniqueid");
+            string host = XmlValue(info, "hostname");
+            if (string.IsNullOrEmpty(host)) host = Environment.MachineName;
+            if (uuid == null || !Regex.IsMatch(uuid, "^[0-9A-Fa-f-]{36}$"))
+            {
+                Log("Keine gültige UUID in serverinfo gefunden.");
+                Status("Fehlgeschlagen.");
+                return;
+            }
+            Log("PC: " + host + "  UUID: " + uuid);
+
+            string sunshineDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Sunshine");
+            string appsJson = FindAppsJson(sunshineDir);
+            if (appsJson == null)
+            {
+                Log("apps.json von Sunshine nicht gefunden (erwartet unter " + sunshineDir + "\\config).");
+                Status("Fehlgeschlagen.");
+                return;
+            }
+            Log("apps.json: " + appsJson);
+
+            var apps = ComputeAppIds(appsJson, Path.Combine(sunshineDir, "assets"));
+            if (apps.Count == 0)
+            {
+                Log("Keine Apps in apps.json gefunden.");
+                Status("Fehlgeschlagen.");
+                return;
+            }
+            KeyValuePair<string, string> chosen = apps[0];
+            foreach (var a in apps)
+            {
+                Log("  App \"" + a.Key + "\" → ID " + a.Value);
+                if (string.Equals(a.Key, "Desktop", StringComparison.OrdinalIgnoreCase)) chosen = a;
+            }
+
+            var pc = new Pc { Name = Clean(host), Uuid = uuid, AppId = chosen.Value, AppName = Clean(chosen.Key) };
+            pcs.RemoveAll(delegate (Pc x) { return string.Equals(x.Uuid, uuid, StringComparison.OrdinalIgnoreCase); });
+            pcs.Add(pc);
+            WritePcs();
+            UI(delegate { RefreshPcBox(pc); });
+            Log("Gespeichert: " + pc.Name + " → " + pc.AppName + " (" + pc.AppId + ")");
+
+            string serial = Connect(ip);
+            if (serial == null) return;
+            PushPcs(serial);
+            Status("\"" + pc.Name + "\" ist jetzt in C3 – Kachel startet direkt den Stream.");
+        }
+
+        void DoRemovePc(string ip)
+        {
+            Pc selected = pcToRemove;
+            if (selected == null)
+            {
+                Status("Kein PC ausgewählt.");
+                return;
+            }
+            pcs.Remove(selected);
+            WritePcs();
+            UI(delegate { RefreshPcBox(pcs.Count > 0 ? pcs[0] : null); });
+            Log("Entfernt: " + selected.Name);
+            string serial = Connect(ip);
+            if (serial == null) return;
+            PushPcs(serial);
+            Status("PC entfernt.");
+        }
+
+        void PushPcs(string serial)
+        {
+            var parts = new List<string>();
+            foreach (Pc pc in pcs) parts.Add(pc.Serialize());
+            string value = string.Join(";", parts.ToArray());
+            string result = Adb("-s " + serial + " shell am start -n " + MainActivity +
+                " -a de.c3.tv.action.SET_PCS --es de.c3.tv.extra.PCS '" + value + "'", 20000);
+            Log("PCs an den TV gesendet (" + pcs.Count + ").");
+            if (result.IndexOf("Error", StringComparison.OrdinalIgnoreCase) >= 0) Log(result.Trim());
+        }
+
+        static string Clean(string s)
+        {
+            return (s ?? "").Replace("|", " ").Replace(";", " ").Replace("'", " ").Trim();
+        }
+
+        static string XmlValue(string xml, string tag)
+        {
+            var m = Regex.Match(xml ?? "", "<" + tag + ">([^<]*)</" + tag + ">");
+            return m.Success ? m.Groups[1].Value.Trim() : null;
+        }
+
+        static string FindAppsJson(string sunshineDir)
+        {
+            string configDir = Path.Combine(sunshineDir, "config");
+            string conf = Path.Combine(configDir, "sunshine.conf");
+            try
+            {
+                if (File.Exists(conf))
+                {
+                    foreach (string line in File.ReadAllLines(conf))
+                    {
+                        string t = line.Trim();
+                        if (!t.StartsWith("file_apps")) continue;
+                        int eq = t.IndexOf('=');
+                        if (eq < 0) continue;
+                        string f = t.Substring(eq + 1).Trim();
+                        if (!Path.IsPathRooted(f)) f = Path.Combine(configDir, f);
+                        if (File.Exists(f)) return f;
+                    }
+                }
+            }
+            catch { }
+            string def = Path.Combine(configDir, "apps.json");
+            return File.Exists(def) ? def : null;
+        }
+
+        /// Returns (name, id) for every app in apps.json, mirroring Sunshine's process.cpp.
+        static List<KeyValuePair<string, string>> ComputeAppIds(string appsJson, string assetsDir)
+        {
+            var result = new List<KeyValuePair<string, string>>();
+            var root = new JavaScriptSerializer().DeserializeObject(File.ReadAllText(appsJson)) as Dictionary<string, object>;
+            if (root == null || !root.ContainsKey("apps")) return result;
+            var apps = root["apps"] as object[];
+            if (apps == null) return result;
+
+            string defaultImage = Path.GetFullPath(Path.Combine(assetsDir, "box.png"));
+            var ids = new HashSet<string>();
+            int index = 0;
+            foreach (object o in apps)
+            {
+                var app = o as Dictionary<string, object>;
+                if (app == null) continue;
+                string name = app.ContainsKey("name") ? Convert.ToString(app["name"]) : "";
+                string image = app.ContainsKey("image-path") ? Convert.ToString(app["image-path"]) : "";
+
+                var sb = new StringBuilder(name);
+                string resolved = ResolveImage(image, assetsDir);
+                if (resolved != null && !string.Equals(Path.GetFullPath(resolved), defaultImage, StringComparison.OrdinalIgnoreCase))
+                {
+                    string hash = Sha256Hex(resolved);
+                    sb.Append(hash ?? resolved);
+                }
+                string noIndex = sb.ToString();
+                string withIndex = noIndex + index;
+                index++;
+
+                string id = SunshineId(noIndex);
+                if (ids.Contains(id)) id = SunshineId(withIndex);
+                ids.Add(id);
+                result.Add(new KeyValuePair<string, string>(name, id));
+            }
+            return result;
+        }
+
+        static string ResolveImage(string imagePath, string assetsDir)
+        {
+            if (string.IsNullOrEmpty(imagePath)) return null;
+            if (!string.Equals(Path.GetExtension(imagePath), ".png", StringComparison.OrdinalIgnoreCase)) return null;
+            try
+            {
+                string inAssets = Path.Combine(assetsDir, imagePath);
+                if (File.Exists(inAssets)) return IsPng(inAssets) ? inAssets : null;
+                if (imagePath == "./assets/steam.png") return Path.Combine(assetsDir, "steam.png");
+                if (File.Exists(imagePath) && IsPng(imagePath)) return imagePath;
+            }
+            catch { }
+            return null;
+        }
+
+        static bool IsPng(string path)
+        {
+            try
+            {
+                byte[] sig = { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A };
+                using (var f = File.OpenRead(path))
+                {
+                    var head = new byte[8];
+                    if (f.Read(head, 0, 8) != 8) return false;
+                    for (int i = 0; i < 8; i++) if (head[i] != sig[i]) return false;
+                    return true;
+                }
+            }
+            catch { return false; }
+        }
+
+        static string Sha256Hex(string path)
+        {
+            try
+            {
+                using (var sha = SHA256.Create())
+                using (var f = File.OpenRead(path))
+                {
+                    var sb = new StringBuilder();
+                    foreach (byte b in sha.ComputeHash(f)) sb.Append(b.ToString("x2"));
+                    return sb.ToString();
+                }
+            }
+            catch { return null; }
+        }
+
+        static uint[] crcTable;
+
+        static string SunshineId(string input)
+        {
+            if (crcTable == null)
+            {
+                crcTable = new uint[256];
+                for (uint n = 0; n < 256; n++)
+                {
+                    uint c = n;
+                    for (int k = 0; k < 8; k++) c = (c & 1) != 0 ? 0xEDB88320u ^ (c >> 1) : c >> 1;
+                    crcTable[n] = c;
+                }
+            }
+            uint crc = 0xFFFFFFFFu;
+            foreach (byte b in Encoding.UTF8.GetBytes(input)) crc = crcTable[(crc ^ b) & 0xFF] ^ (crc >> 8);
+            crc ^= 0xFFFFFFFFu;
+            long signed = unchecked((int)crc);
+            return Math.Abs(signed).ToString();
+        }
+
+        void LoadPcs()
+        {
+            pcs.Clear();
+            try
+            {
+                if (File.Exists(pcsPath))
+                {
+                    foreach (string line in File.ReadAllLines(pcsPath))
+                    {
+                        string[] p = line.Split('|');
+                        if (p.Length < 4) continue;
+                        pcs.Add(new Pc { Name = p[0], Uuid = p[1], AppId = p[2], AppName = p[3] });
+                    }
+                }
+            }
+            catch { }
+            RefreshPcBox(pcs.Count > 0 ? pcs[0] : null);
+        }
+
+        void WritePcs()
+        {
+            var lines = new List<string>();
+            foreach (Pc pc in pcs) lines.Add(pc.Serialize());
+            try { File.WriteAllLines(pcsPath, lines.ToArray()); } catch { }
+        }
+
+        void RefreshPcBox(Pc select)
+        {
+            pcBox.Items.Clear();
+            foreach (Pc pc in pcs) pcBox.Items.Add(pc);
+            if (select != null) pcBox.SelectedItem = select;
         }
 
         /// Returns the adb serial ("ip:5555") or null if the TV is not reachable/authorized.
@@ -520,6 +833,9 @@ namespace C3
             startButton.Enabled = !busy;
             redirectOnButton.Enabled = !busy;
             redirectOffButton.Enabled = !busy;
+            addPcButton.Enabled = !busy;
+            removePcButton.Enabled = !busy;
+            pcBox.Enabled = !busy;
             ipBox.Enabled = !busy;
             nameBox.Enabled = !busy;
             deviceBox.Enabled = !busy;

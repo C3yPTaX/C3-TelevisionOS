@@ -52,9 +52,9 @@ jobs:
         run: |
           $csc = "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
           New-Item -ItemType Directory -Force out | Out-Null
-          & $csc /nologo /target:winexe /optimize+ /out:out\C3-Updater.exe `
+          & $csc /nologo /codepage:65001 /target:winexe /optimize+ /out:out\C3-Updater.exe `
             /win32icon:tools\updater\C3Updater.ico `
-            /reference:System.dll /reference:System.Drawing.dll /reference:System.Windows.Forms.dll `
+            /reference:System.dll /reference:System.Core.dll /reference:System.Drawing.dll /reference:System.Windows.Forms.dll /reference:System.Web.Extensions.dll `
             tools\updater\C3Updater.cs
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Get-Item out\C3-Updater.exe

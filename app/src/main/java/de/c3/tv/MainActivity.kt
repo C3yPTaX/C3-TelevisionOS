@@ -19,6 +19,7 @@ import android.widget.Toast
 import de.c3.tv.core.AppCatalog
 import de.c3.tv.core.AppEntry
 import de.c3.tv.core.AppLauncher
+import de.c3.tv.core.PcStore
 import de.c3.tv.core.SystemShortcuts
 import de.c3.tv.core.Tile
 import de.c3.tv.core.TvInputs
@@ -41,7 +42,9 @@ class MainActivity : Activity() {
 
     private val appTiles = mutableListOf<Pair<AppEntry, Tile>>()
     private var playStationTile: Tile? = null
-    private var moonlightTile: Tile? = null
+    private lateinit var pcStore: PcStore
+    private val pcTiles = mutableListOf<Tile>()
+    private var moonlightInstalled = true
     private var devicesRow: LinearLayout? = null
     private val hdmiTiles = mutableMapOf<String, Tile>()
 
@@ -52,8 +55,25 @@ class MainActivity : Activity() {
         super.onCreate(savedInstanceState)
         launcher = AppLauncher(this)
         tvInputs = TvInputs(this)
+        pcStore = PcStore(this)
         setContentView(buildLayout())
+        handleConfigIntent(intent)
+        rebuildPcTiles()
         appTiles.firstOrNull()?.second?.requestFocus()
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        if (handleConfigIntent(intent)) rebuildPcTiles()
+    }
+
+    /** PC list pushed by the C3 Updater via adb (see PcStore). */
+    private fun handleConfigIntent(intent: Intent?): Boolean {
+        if (intent?.action != PcStore.ACTION_SET_PCS) return false
+        val pcs = pcStore.save(intent.getStringExtra(PcStore.EXTRA_PCS).orEmpty())
+        toast(if (pcs.isEmpty()) "C3 Desktop: keine PCs gespeichert" else "C3 Desktop: " + pcs.joinToString { it.name })
+        return true
     }
 
     override fun onStart() {
@@ -106,13 +126,8 @@ class MainActivity : Activity() {
             setTitle("PlayStation 5", "HDMI 2")
             setOnClickListener { onPlayStation() }
         }
-        val pc = Tile(this, APP_W, APP_H).apply {
-            setTitle("Gaming-PC", "Moonlight")
-            setOnClickListener { launchApp(AppCatalog.moonlight, hint = "Moonlight aus dem Amazon Appstore installieren") }
-        }
         playStationTile = ps
-        moonlightTile = pc
-        val devices = row(listOf(ps, pc))
+        val devices = row(listOf(ps))
         devicesRow = (devices as HorizontalScrollView).getChildAt(0) as LinearLayout
         column.addView(devices)
 
@@ -192,7 +207,8 @@ class MainActivity : Activity() {
             mainHandler.post {
                 if (isDestroyed) return@post
                 apps.forEach { (tile, pkg) -> tile.setAvailable(pkg != null) }
-                moonlightTile?.setAvailable(moonlightInstalled)
+                this.moonlightInstalled = moonlightInstalled
+                pcTiles.forEach { it.setAvailable(moonlightInstalled) }
                 playStationInputId = ps?.id ?: TvInputs.PS5_FALLBACK_INPUT
                 otherPorts.forEach { addHdmiTile(it) }
             }
@@ -204,6 +220,36 @@ class MainActivity : Activity() {
             }
         }
         executor.shutdown()
+    }
+
+    /** PC tiles sit right after the PlayStation tile; without configured PCs one Moonlight tile. */
+    private fun rebuildPcTiles() {
+        val row = devicesRow ?: return
+        pcTiles.forEach { row.removeView(it) }
+        pcTiles.clear()
+
+        val pcs = pcStore.load()
+        if (pcs.isEmpty()) {
+            pcTiles += Tile(this, APP_W, APP_H).apply {
+                setTitle("PC streamen", "Moonlight")
+                setOnClickListener { launchApp(AppCatalog.moonlight, hint = "Moonlight aus dem Amazon Appstore installieren") }
+            }
+        } else {
+            pcs.forEach { pc ->
+                pcTiles += Tile(this, APP_W, APP_H).apply {
+                    setTitle(pc.name, pc.appName)
+                    setOnClickListener {
+                        if (!launcher.start(PcStore.streamIntent(pc))) {
+                            toast("Moonlight fehlt oder ist veraltet – im Amazon Appstore installieren/aktualisieren")
+                        }
+                    }
+                }
+            }
+        }
+        pcTiles.forEachIndexed { i, tile ->
+            tile.setAvailable(moonlightInstalled)
+            row.addView(tile, 1 + i)
+        }
     }
 
     private fun addHdmiTile(input: TvInputs.Input) {
