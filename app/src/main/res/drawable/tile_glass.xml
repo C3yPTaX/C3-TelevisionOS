@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- "Liquid glass" without blur: translucent fill, bright top edge, hairline. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape>
+            <gradient android:angle="270" android:endColor="@color/c3_glass_bottom" android:startColor="@color/c3_glass_top" />
+            <corners android:radius="@dimen/c3_radius_device" />
+        </shape>
+    </item>
+    <item>
+        <shape>
+            <stroke android:width="0.5dp" android:color="@color/c3_hairline" />
+            <corners android:radius="@dimen/c3_radius_device" />
+        </shape>
+    </item>
+    <item android:bottom="40dp">
+        <shape>
+            <gradient android:angle="270" android:endColor="#00FFFFFF" android:startColor="#14FFFFFF" />
+            <corners android:topLeftRadius="@dimen/c3_radius_device" android:topRightRadius="@dimen/c3_radius_device" />
+        </shape>
+    </item>
+</layer-list>

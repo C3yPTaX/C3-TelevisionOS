@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Canvas 960 x 540 dp; safe area like tvOS (80/60 px at 1080p) -->
+    <dimen name="c3_safe_h">40dp</dimen>
+    <dimen name="c3_safe_v">30dp</dimen>
+    <dimen name="c3_radius_app">12dp</dimen>
+    <dimen name="c3_radius_device">14dp</dimen>
+    <dimen name="c3_ring">1.5dp</dimen>
+</resources>

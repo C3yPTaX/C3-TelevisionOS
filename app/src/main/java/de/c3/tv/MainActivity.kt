@@ -2,7 +2,6 @@ package de.c3.tv
 
 import android.app.Activity
 import android.content.Intent
-import android.graphics.Typeface
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -12,6 +11,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.HorizontalScrollView
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextClock
 import android.widget.TextView
@@ -19,6 +19,8 @@ import android.widget.Toast
 import de.c3.tv.core.AppCatalog
 import de.c3.tv.core.AppEntry
 import de.c3.tv.core.AppLauncher
+import de.c3.tv.core.C3Fonts
+import de.c3.tv.core.DockButton
 import de.c3.tv.core.PcStore
 import de.c3.tv.core.SystemShortcuts
 import de.c3.tv.core.Tile
@@ -26,12 +28,14 @@ import de.c3.tv.core.TvInputs
 import de.c3.tv.core.dp
 import de.c3.tv.feature.diagnostics.DiagnosticsActivity
 import de.c3.tv.feature.inputs.InputPlayerActivity
+import de.c3.tv.redirect.HomeRedirectService
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
 /**
- * C3 Home (prototype P0). Single activity, views built in code, no background work
- * except one short-lived thread that loads app banners.
+ * C3 Television OS home screen. Single activity, views built in code (design system:
+ * docs/04-design-proposal.md), no background work except one short-lived thread that
+ * loads app banners and TV inputs.
  */
 class MainActivity : Activity() {
 
@@ -48,6 +52,9 @@ class MainActivity : Activity() {
     private var devicesRow: LinearLayout? = null
     private val hdmiTiles = mutableMapOf<String, Tile>()
 
+    private lateinit var shelfCategory: TextView
+    private lateinit var shelfTitle: TextView
+
     /** Updated off the main thread by [refresh]; read on the main thread only. */
     private var playStationInputId: String = TvInputs.PS5_FALLBACK_INPUT
 
@@ -59,7 +66,10 @@ class MainActivity : Activity() {
         setContentView(buildLayout())
         handleConfigIntent(intent)
         rebuildPcTiles()
-        appTiles.firstOrNull()?.second?.requestFocus()
+        appTiles.firstOrNull()?.second?.let { first ->
+            first.requestFocus()
+            showShelf(first.shelfCategory, first.shelfTitle)
+        }
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -107,23 +117,27 @@ class MainActivity : Activity() {
             orientation = LinearLayout.VERTICAL
             clipChildren = false
             clipToPadding = false
-            setPadding(dp(28), dp(20), dp(28), dp(12))
+            setPadding(dp(40), dp(30), dp(40), dp(30))
         }
 
         column.addView(buildHeader())
+        column.addView(buildShelf())
 
         column.addView(sectionTitle("Apps"))
         column.addView(row(AppCatalog.streaming.map { entry ->
-            Tile(this, APP_W, APP_H).also { tile ->
+            Tile(this, Tile.Style.APP).also { tile ->
                 tile.setTitle(entry.title)
+                tile.shelfCategory = "Streaming"
+                tile.shelfTitle = entry.title
+                tile.onFocused = { showShelf(it.shelfCategory, it.shelfTitle) }
                 tile.setOnClickListener { launchApp(entry) }
                 appTiles += entry to tile
             }
         }))
 
         column.addView(sectionTitle("Geräte"))
-        val ps = Tile(this, APP_W, APP_H).apply {
-            setTitle("PlayStation 5", "HDMI 2")
+        val ps = deviceTile("PlayStation 5", R.drawable.ic_gamepad, "Konsole · HDMI 2").apply {
+            setChip("HDMI 2", ok = true)
             setOnClickListener { onPlayStation() }
         }
         playStationTile = ps
@@ -131,45 +145,120 @@ class MainActivity : Activity() {
         devicesRow = (devices as HorizontalScrollView).getChildAt(0) as LinearLayout
         column.addView(devices)
 
-        column.addView(sectionTitle("System"))
-        column.addView(row(SystemShortcuts.all.map { sc ->
-            Tile(this, APP_W, APP_H).apply {
-                setTitle(sc.title, sc.subtitle)
-                setOnClickListener {
-                    if (!launcher.start(sc.intent)) toast("${sc.title} ist auf diesem Gerät nicht erreichbar")
-                }
-            }
-        }))
-
         return FrameLayout(this).apply {
             clipChildren = false
             addView(column, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+            addView(buildDock(), FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL,
+            ).apply { bottomMargin = dp(30) })
+            addView(TextView(context).apply {
+                text = "by Nico Lukowski"
+                textSize = 8f
+                typeface = C3Fonts.medium(context)
+                setTextColor(getColor(R.color.c3_text_tertiary))
+            }, FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                Gravity.BOTTOM or Gravity.END,
+            ).apply {
+                rightMargin = dp(40)
+                bottomMargin = dp(37)
+            })
         }
     }
 
     private fun buildHeader(): View = LinearLayout(this).apply {
         orientation = LinearLayout.HORIZONTAL
         gravity = Gravity.CENTER_VERTICAL
-        setPadding(dp(8), 0, dp(8), dp(4))
+        addView(ImageView(context).apply { setImageResource(R.drawable.ic_c3) },
+            LinearLayout.LayoutParams(dp(17), dp(17)).apply { marginEnd = dp(7) })
         addView(TextView(context).apply {
-            text = "C3"
-            textSize = 22f
-            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            text = getString(R.string.app_name)
+            textSize = 13f
+            typeface = C3Fonts.semibold(context)
             setTextColor(getColor(R.color.c3_text))
         }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         addView(TextClock(context).apply {
             format24Hour = "HH:mm"
             format12Hour = "HH:mm"
-            textSize = 20f
+            textSize = 17f
+            typeface = C3Fonts.medium(context)
             setTextColor(getColor(R.color.c3_text))
         })
     }
 
+    /** Large title of the focused element ("top shelf"); cross-fades on focus change only. */
+    private fun buildShelf(): View = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        gravity = Gravity.BOTTOM
+        layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(112))
+        shelfCategory = TextView(context).apply {
+            textSize = 11f
+            typeface = C3Fonts.medium(context)
+            setTextColor(getColor(R.color.c3_text_secondary))
+        }
+        shelfTitle = TextView(context).apply {
+            textSize = 38f
+            typeface = C3Fonts.bold(context)
+            letterSpacing = -0.02f
+            includeFontPadding = false
+            maxLines = 1
+            setTextColor(getColor(R.color.c3_text))
+        }
+        addView(shelfCategory)
+        addView(shelfTitle, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+            topMargin = dp(4)
+            bottomMargin = dp(6)
+        })
+    }
+
+    private fun showShelf(category: String, title: String) {
+        if (shelfTitle.text == title && shelfCategory.text == category) return
+        shelfTitle.animate().cancel()
+        shelfTitle.animate().alpha(0f).setDuration(70L).withEndAction {
+            shelfCategory.text = category
+            shelfTitle.text = title
+            shelfTitle.animate().alpha(1f).setDuration(90L).start()
+        }.start()
+    }
+
+    private fun buildDock(): View = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        clipChildren = false
+        clipToPadding = false
+        setBackgroundResource(R.drawable.dock_bg)
+        val p = dp(5)
+        setPadding(p, p, p, p)
+        SystemShortcuts.all.forEach { sc ->
+            addView(DockButton(context, sc.title, sc.iconRes).apply {
+                onFocused = { showShelf("System", sc.subtitle) }
+                setOnClickListener {
+                    if (sc.iconRes == R.drawable.ic_home) HomeRedirectService.requestEscape()
+                    if (!launcher.start(sc.intent)) toast("${sc.title} ist auf diesem Gerät nicht erreichbar")
+                }
+            }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                marginEnd = dp(2)
+            })
+        }
+    }
+
+    private fun deviceTile(name: String, iconRes: Int, category: String): Tile =
+        Tile(this, Tile.Style.DEVICE).apply {
+            setTitle(name)
+            setIcon(iconRes)
+            shelfCategory = category
+            shelfTitle = name
+            onFocused = { showShelf(it.shelfCategory, it.shelfTitle) }
+        }
+
     private fun sectionTitle(text: String): View = TextView(this).apply {
         this.text = text
-        textSize = 13f
+        textSize = 12f
+        typeface = C3Fonts.semibold(context)
         setTextColor(getColor(R.color.c3_text_secondary))
-        setPadding(dp(8), dp(10), 0, 0)
+        setPadding(0, dp(12), 0, dp(8))
     }
 
     private fun row(tiles: List<View>): View {
@@ -177,6 +266,8 @@ class MainActivity : Activity() {
             orientation = LinearLayout.HORIZONTAL
             clipChildren = false
             clipToPadding = false
+            val v = dp(6)
+            setPadding(0, v, dp(12), v)
             tiles.forEach { addView(it) }
         }
         return HorizontalScrollView(this).apply {
@@ -184,6 +275,7 @@ class MainActivity : Activity() {
             clipChildren = false
             clipToPadding = false
             isFocusable = false
+            overScrollMode = View.OVER_SCROLL_NEVER
             addView(inner)
         }
     }
@@ -206,7 +298,11 @@ class MainActivity : Activity() {
 
             mainHandler.post {
                 if (isDestroyed) return@post
-                apps.forEach { (tile, pkg) -> tile.setAvailable(pkg != null) }
+                apps.forEach { (tile, pkg) ->
+                tile.setAvailable(pkg != null)
+                tile.shelfCategory = if (pkg != null) "Streaming" else "Nicht installiert"
+                if (tile.isFocused) showShelf(tile.shelfCategory, tile.shelfTitle)
+            }
                 this.moonlightInstalled = moonlightInstalled
                 pcTiles.forEach { it.setAvailable(moonlightInstalled) }
                 playStationInputId = ps?.id ?: TvInputs.PS5_FALLBACK_INPUT
@@ -230,14 +326,14 @@ class MainActivity : Activity() {
 
         val pcs = pcStore.load()
         if (pcs.isEmpty()) {
-            pcTiles += Tile(this, APP_W, APP_H).apply {
-                setTitle("PC streamen", "Moonlight")
+            pcTiles += deviceTile("PC streamen", R.drawable.ic_monitor, "C3 Desktop").apply {
+                setChip("Moonlight", ok = false)
                 setOnClickListener { launchApp(AppCatalog.moonlight, hint = "Moonlight aus dem Amazon Appstore installieren") }
             }
         } else {
             pcs.forEach { pc ->
-                pcTiles += Tile(this, APP_W, APP_H).apply {
-                    setTitle(pc.name, pc.appName)
+                pcTiles += deviceTile(pc.name, R.drawable.ic_monitor, "C3 Desktop · ${pc.appName}").apply {
+                    setChip(pc.appName, ok = false)
                     setOnClickListener {
                         if (!launcher.start(PcStore.streamIntent(pc))) {
                             toast("Moonlight fehlt oder ist veraltet – im Amazon Appstore installieren/aktualisieren")
@@ -255,8 +351,7 @@ class MainActivity : Activity() {
     private fun addHdmiTile(input: TvInputs.Input) {
         if (hdmiTiles.containsKey(input.id)) return
         val label = input.label.ifEmpty { "HDMI" }
-        val tile = Tile(this, APP_W, APP_H).apply {
-            setTitle(label, "Eingang")
+        val tile = deviceTile(label, R.drawable.ic_hdmi, "Eingang").apply {
             setOnClickListener { startActivity(InputPlayerActivity.intent(this@MainActivity, input.id, label)) }
         }
         hdmiTiles[input.id] = tile
@@ -283,8 +378,4 @@ class MainActivity : Activity() {
 
     private fun toast(message: String) = Toast.makeText(this, message, Toast.LENGTH_LONG).show()
 
-    companion object {
-        private const val APP_W = 132
-        private const val APP_H = 74
-    }
 }

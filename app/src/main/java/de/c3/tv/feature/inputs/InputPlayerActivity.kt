@@ -15,6 +15,7 @@ import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.TextView
 import de.c3.tv.R
+import de.c3.tv.core.C3Fonts
 import de.c3.tv.core.dp
 
 /**
@@ -62,11 +63,11 @@ class InputPlayerActivity : Activity() {
 
         overlayText = TextView(this).apply {
             setTextColor(getColor(R.color.c3_text))
-            textSize = 16f
+            textSize = 13f
+            typeface = C3Fonts.medium(context)
             gravity = Gravity.CENTER
-            setBackgroundColor(0xB3000000.toInt())
-            val p = dp(16)
-            setPadding(p * 2, p, p * 2, p)
+            setBackgroundResource(R.drawable.overlay_pill)
+            setPadding(dp(20), dp(10), dp(20), dp(10))
             text = "$inputTitle wird geöffnet …"
         }
 
@@ -77,7 +78,7 @@ class InputPlayerActivity : Activity() {
                 ViewGroup.LayoutParams.WRAP_CONTENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT,
                 Gravity.CENTER_HORIZONTAL or Gravity.BOTTOM,
-            ).apply { bottomMargin = dp(48) })
+            ).apply { bottomMargin = dp(36) })
         }
         setContentView(root)
     }

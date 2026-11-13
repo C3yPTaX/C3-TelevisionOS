@@ -55,6 +55,12 @@ class HomeRedirectService : AccessibilityService() {
         if (escaped) return
 
         val now = SystemClock.elapsedRealtime()
+        if (now - escapeRequestedAt < ESCAPE_REQUEST_MS) {
+            // C3's own "Fire TV" button: the user explicitly wants Amazon home.
+            escaped = true
+            Log.i(TAG, "Escape requested by C3")
+            return
+        }
         val sinceRedirect = now - lastRedirectAt
         if (sinceRedirect < DUPLICATE_WINDOW_MS) return // same HOME press
         if (sinceRedirect < ESCAPE_WINDOW_MS) {
@@ -87,6 +93,15 @@ class HomeRedirectService : AccessibilityService() {
         private const val DUPLICATE_WINDOW_MS = 400L
         private const val ESCAPE_WINDOW_MS = 1200L
         private const val BOOT_WINDOW_MS = 5 * 60_000L
+        private const val ESCAPE_REQUEST_MS = 3000L
+
+        @Volatile
+        private var escapeRequestedAt = 0L
+
+        /** Called by C3 before it opens Amazon home on purpose (same process). */
+        fun requestEscape() {
+            escapeRequestedAt = SystemClock.elapsedRealtime()
+        }
         private val IGNORED_PACKAGES = setOf(
             "android",
             "com.android.systemui",
