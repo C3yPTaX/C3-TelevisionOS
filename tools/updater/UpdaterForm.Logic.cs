@@ -1,6 +1,5 @@
-// C3 Updater – lädt die neueste C3-APK von GitHub und installiert sie per ADB auf dem TV.
-// Bewusst in C# 5 / .NET Framework 4 geschrieben: wird mit dem in Windows enthaltenen
-// csc.exe kompiliert, braucht keine Laufzeit-Installation und keine Abhängigkeiten.
+// C3 Updater – Logik: TV-Verbindung, Updates, Home-Taste, PCs für C3 Desktop.
+// C# 5 / .NET Framework 4: wird mit dem in Windows enthaltenen csc.exe kompiliert.
 
 using System;
 using System.Collections.Generic;
@@ -11,13 +10,13 @@ using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
-using System.Web.Script.Serialization;
 using System.Threading;
+using System.Web.Script.Serialization;
 using System.Windows.Forms;
 
 namespace C3
 {
-    public class UpdaterForm : Form
+    public partial class UpdaterForm
     {
         const string ApkUrl = "https://github.com/C3yPTaX/C3-TelevisionOS/releases/download/c3-latest/c3-tv.apk";
         const string VersionUrl = "https://github.com/C3yPTaX/C3-TelevisionOS/releases/download/c3-latest/c3-version.txt";
@@ -25,33 +24,12 @@ namespace C3
         const string MainActivity = "de.c3.tv/.MainActivity";
         const string RedirectService = "de.c3.tv/de.c3.tv.redirect.HomeRedirectService";
 
-        static readonly Color Bg = Color.FromArgb(18, 20, 26);
-        static readonly Color Panel = Color.FromArgb(38, 42, 51);
-        static readonly Color Fg = Color.FromArgb(237, 239, 244);
-        static readonly Color Muted = Color.FromArgb(140, 146, 160);
-        static readonly Color Accent = Color.FromArgb(90, 169, 255);
-
-        readonly ComboBox deviceBox = new ComboBox();
-        readonly Button removeButton = new Button();
-        readonly TextBox nameBox = new TextBox();
-        readonly TextBox ipBox = new TextBox();
-        readonly Button saveButton = new Button();
-        readonly Button updateButton = new Button();
-        readonly Button startButton = new Button();
-        readonly Button redirectOnButton = new Button();
-        readonly Button redirectOffButton = new Button();
-        readonly ComboBox pcBox = new ComboBox();
-        readonly Button addPcButton = new Button();
-        readonly Button removePcButton = new Button();
         readonly List<Pc> pcs = new List<Pc>();
-        Pc pcToRemove;
-        readonly Label statusLabel = new Label();
-        readonly TextBox log = new TextBox();
-
         readonly List<Device> devices = new List<Device>();
-        readonly string configPath;
-        readonly string devicesPath;
-        readonly string pcsPath;
+        Pc pcToRemove;
+        string configPath;
+        string devicesPath;
+        string pcsPath;
         string adbPath;
 
         class Pc
@@ -71,133 +49,13 @@ namespace C3
             public override string ToString() { return Name + "  (" + Ip + ")"; }
         }
 
-        public UpdaterForm()
+        void InitStorage()
         {
             string dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "C3Updater");
             Directory.CreateDirectory(dir);
             configPath = Path.Combine(dir, "tv-ip.txt");
             devicesPath = Path.Combine(dir, "devices.txt");
             pcsPath = Path.Combine(dir, "pcs.txt");
-
-            Text = "C3 Updater";
-            try { Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch { }
-            ClientSize = new Size(560, 640);
-            FormBorderStyle = FormBorderStyle.FixedSingle;
-            MaximizeBox = false;
-            StartPosition = FormStartPosition.CenterScreen;
-            BackColor = Bg;
-            ForeColor = Fg;
-            Font = new Font("Segoe UI", 10f);
-
-            var title = new Label { Text = "C3 TelevisionOS", Font = new Font("Segoe UI Semibold", 16f), ForeColor = Fg, AutoSize = true, Location = new Point(20, 16) };
-
-            // --- saved devices
-            var deviceLabel = new Label { Text = "Gespeichertes Gerät", ForeColor = Muted, AutoSize = true, Location = new Point(22, 62) };
-            deviceBox.Location = new Point(20, 84);
-            deviceBox.Size = new Size(380, 28);
-            deviceBox.DropDownStyle = ComboBoxStyle.DropDownList;
-            deviceBox.FlatStyle = FlatStyle.Flat;
-            deviceBox.BackColor = Panel;
-            deviceBox.ForeColor = Fg;
-            deviceBox.SelectedIndexChanged += delegate { OnDeviceSelected(); };
-
-            StyleButton(removeButton, "Entfernen", false);
-            removeButton.Location = new Point(410, 82);
-            removeButton.Size = new Size(130, 32);
-            removeButton.Click += delegate { RemoveDevice(); };
-
-            // --- name + ip
-            var nameLabel = new Label { Text = "TV-Name", ForeColor = Muted, AutoSize = true, Location = new Point(22, 126) };
-            nameBox.Location = new Point(20, 148);
-            nameBox.Size = new Size(200, 28);
-            StyleTextBox(nameBox);
-
-            var ipLabel = new Label { Text = "IP-Adresse", ForeColor = Muted, AutoSize = true, Location = new Point(232, 126) };
-            ipBox.Location = new Point(230, 148);
-            ipBox.Size = new Size(170, 28);
-            StyleTextBox(ipBox);
-
-            StyleButton(saveButton, "Gerät speichern", false);
-            saveButton.Location = new Point(410, 145);
-            saveButton.Size = new Size(130, 32);
-            saveButton.Click += delegate { SaveDevice(); };
-
-            // --- actions
-            StyleButton(updateButton, "TV aktualisieren", true);
-            updateButton.Location = new Point(20, 196);
-            updateButton.Size = new Size(260, 38);
-            updateButton.Click += delegate { RunAsync(Job.Update); };
-
-            StyleButton(startButton, "C3 starten", false);
-            startButton.Location = new Point(290, 196);
-            startButton.Size = new Size(250, 38);
-            startButton.Click += delegate { RunAsync(Job.Start); };
-
-            StyleButton(redirectOnButton, "Home-Taste → C3", false);
-            redirectOnButton.Location = new Point(20, 242);
-            redirectOnButton.Size = new Size(260, 34);
-            redirectOnButton.Click += delegate { RunAsync(Job.RedirectOn); };
-
-            StyleButton(redirectOffButton, "Home-Taste → Amazon", false);
-            redirectOffButton.Location = new Point(290, 242);
-            redirectOffButton.Size = new Size(250, 34);
-            redirectOffButton.Click += delegate { RunAsync(Job.RedirectOff); };
-
-            // --- PCs for C3 Desktop
-            var pcLabel = new Label { Text = "PCs für C3 Desktop (Sunshine)", ForeColor = Muted, AutoSize = true, Location = new Point(22, 290) };
-            pcBox.Location = new Point(20, 314);
-            pcBox.Size = new Size(260, 28);
-            pcBox.DropDownStyle = ComboBoxStyle.DropDownList;
-            pcBox.FlatStyle = FlatStyle.Flat;
-            pcBox.BackColor = Panel;
-            pcBox.ForeColor = Fg;
-
-            StyleButton(addPcButton, "Diesen PC hinzufügen", false);
-            addPcButton.Location = new Point(290, 312);
-            addPcButton.Size = new Size(160, 32);
-            addPcButton.Click += delegate { RunAsync(Job.AddPc); };
-
-            StyleButton(removePcButton, "Entfernen", false);
-            removePcButton.Location = new Point(458, 312);
-            removePcButton.Size = new Size(82, 32);
-            removePcButton.Click += delegate { pcToRemove = pcBox.SelectedItem as Pc; RunAsync(Job.RemovePc); };
-
-            statusLabel.Location = new Point(22, 360);
-            statusLabel.Size = new Size(520, 22);
-            statusLabel.ForeColor = Muted;
-            statusLabel.Text = "Bereit.";
-
-            log.Location = new Point(20, 386);
-            log.Size = new Size(520, 236);
-            log.Multiline = true;
-            log.ReadOnly = true;
-            log.ScrollBars = ScrollBars.Vertical;
-            log.BackColor = Panel;
-            log.ForeColor = Fg;
-            log.BorderStyle = BorderStyle.None;
-            log.Font = new Font("Consolas", 9f);
-
-            Controls.AddRange(new Control[] { title, deviceLabel, deviceBox, removeButton, nameLabel, nameBox, ipLabel, ipBox, saveButton, updateButton, startButton, redirectOnButton, redirectOffButton, pcLabel, pcBox, addPcButton, removePcButton, statusLabel, log });
-            AcceptButton = updateButton;
-            LoadDevices();
-            LoadPcs();
-        }
-
-        void StyleButton(Button b, string text, bool primary)
-        {
-            b.Text = text;
-            b.FlatStyle = FlatStyle.Flat;
-            b.FlatAppearance.BorderSize = 0;
-            b.BackColor = primary ? Accent : Panel;
-            b.ForeColor = primary ? Color.Black : Fg;
-            b.Cursor = Cursors.Hand;
-        }
-
-        static void StyleTextBox(TextBox t)
-        {
-            t.BackColor = Panel;
-            t.ForeColor = Fg;
-            t.BorderStyle = BorderStyle.FixedSingle;
         }
 
         // ------------------------------------------------------------------ devices
@@ -298,17 +156,17 @@ namespace C3
 
         // ------------------------------------------------------------------ workflow
 
-        enum Job { Update, Start, RedirectOn, RedirectOff, AddPc, RemovePc }
+        enum Job { Update, Start, RedirectOn, RedirectOff, AddPc, RemovePc, InstallSunshine }
 
         void RunAsync(Job job)
         {
             string ip = ipBox.Text.Trim();
-            if (ip.Length == 0)
+            if (ip.Length == 0 && job != Job.InstallSunshine && job != Job.AddPc)
             {
                 MessageBox.Show(this, "Bitte die IP-Adresse des Fernsehers eintragen.", "C3 Updater");
                 return;
             }
-            RememberIp(ip);
+            if (ip.Length > 0) RememberIp(ip);
             SetBusy(true);
             log.Clear();
 
@@ -324,6 +182,7 @@ namespace C3
                         case Job.RedirectOff: DoRedirect(ip, false); break;
                         case Job.AddPc: DoAddThisPc(ip); break;
                         case Job.RemovePc: DoRemovePc(ip); break;
+                        case Job.InstallSunshine: DoInstallSunshine(); break;
                     }
                 }
                 catch (Exception e)
@@ -368,6 +227,7 @@ namespace C3
             Adb("-s " + serial + " shell am start -n " + MainActivity, 20000);
             if (pcs.Count > 0) PushPcs(serial);
             string now = InstalledVersion(serial);
+            UI(delegate { SetTvStatus(true, now); });
             Status("Fertig – C3 " + (now ?? "") + " ist installiert und gestartet.");
             Log("Fertig.");
         }
@@ -420,6 +280,7 @@ namespace C3
 
             string after = Adb("-s " + serial + " shell settings get secure enabled_accessibility_services", 15000).Trim();
             Log("Nachher: " + after);
+            UI(delegate { SetRedirectState(enable); });
             if (enable)
             {
                 Adb("-s " + serial + " shell am start -n " + MainActivity, 20000);
@@ -491,6 +352,11 @@ namespace C3
             UI(delegate { RefreshPcBox(pc); });
             Log("Gespeichert: " + pc.Name + " → " + pc.AppName + " (" + pc.AppId + ")");
 
+            if (ip.Length == 0)
+            {
+                Status("\"" + pc.Name + "\" gespeichert – wird beim nächsten TV-Update übertragen.");
+                return;
+            }
             string serial = Connect(ip);
             if (serial == null) return;
             PushPcs(serial);
@@ -724,8 +590,13 @@ namespace C3
                 Log("Am Fernseher die Abfrage \"Debugging zulassen?\" bestätigen und erneut versuchen.");
                 Log("ADB-Debugging muss in den Entwickleroptionen aktiv sein.");
                 Status("Fernseher nicht verbunden.");
+                UI(delegate { SetTvStatus(false, null); });
                 return null;
             }
+            string version = InstalledVersion(serial);
+            string services = Adb("-s " + serial + " shell settings get secure enabled_accessibility_services", 15000);
+            bool redirect = services.IndexOf(RedirectService, StringComparison.OrdinalIgnoreCase) >= 0;
+            UI(delegate { SetTvStatus(true, version); SetRedirectState(redirect); });
             return serial;
         }
 
@@ -827,23 +698,6 @@ namespace C3
             try { File.WriteAllText(configPath, ip); } catch { }
         }
 
-        void SetBusy(bool busy)
-        {
-            updateButton.Enabled = !busy;
-            startButton.Enabled = !busy;
-            redirectOnButton.Enabled = !busy;
-            redirectOffButton.Enabled = !busy;
-            addPcButton.Enabled = !busy;
-            removePcButton.Enabled = !busy;
-            pcBox.Enabled = !busy;
-            ipBox.Enabled = !busy;
-            nameBox.Enabled = !busy;
-            deviceBox.Enabled = !busy;
-            saveButton.Enabled = !busy;
-            removeButton.Enabled = !busy && devices.Count > 0;
-            Cursor = busy ? Cursors.WaitCursor : Cursors.Default;
-        }
-
         void Log(string line)
         {
             UI(delegate { log.AppendText(line + Environment.NewLine); });
@@ -860,12 +714,5 @@ namespace C3
             if (InvokeRequired) BeginInvoke(action); else action();
         }
 
-        [STAThread]
-        static void Main()
-        {
-            Application.EnableVisualStyles();
-            Application.SetCompatibleTextRenderingDefault(false);
-            Application.Run(new UpdaterForm());
-        }
     }
 }
