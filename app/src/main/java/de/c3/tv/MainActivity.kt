@@ -24,6 +24,7 @@ import de.c3.tv.core.Tile
 import de.c3.tv.core.TvInputs
 import de.c3.tv.core.dp
 import de.c3.tv.feature.diagnostics.DiagnosticsActivity
+import de.c3.tv.feature.inputs.InputPlayerActivity
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
@@ -41,6 +42,11 @@ class MainActivity : Activity() {
     private val appTiles = mutableListOf<Pair<AppEntry, Tile>>()
     private var playStationTile: Tile? = null
     private var moonlightTile: Tile? = null
+    private var devicesRow: LinearLayout? = null
+    private val hdmiTiles = mutableMapOf<String, Tile>()
+
+    /** Updated off the main thread by [refresh]; read on the main thread only. */
+    private var playStationInputId: String = TvInputs.PS5_FALLBACK_INPUT
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -106,7 +112,9 @@ class MainActivity : Activity() {
         }
         playStationTile = ps
         moonlightTile = pc
-        column.addView(row(listOf(ps, pc)))
+        val devices = row(listOf(ps, pc))
+        devicesRow = (devices as HorizontalScrollView).getChildAt(0) as LinearLayout
+        column.addView(devices)
 
         column.addView(sectionTitle("System"))
         column.addView(row(SystemShortcuts.all.map { sc ->
@@ -167,29 +175,46 @@ class MainActivity : Activity() {
 
     // ---------------------------------------------------------------- state
 
-    /** Re-evaluates installed apps and the PS5 state; banners load off the main thread. */
+    /**
+     * Re-evaluates installed apps and TV inputs on a short-lived background thread,
+     * so the first frame is never blocked by PackageManager or TV-input binder calls.
+     */
     private fun refresh() {
-        val resolved = appTiles.map { (entry, tile) ->
-            val pkg = launcher.resolve(entry)
-            tile.setAvailable(pkg != null)
-            Triple(entry, tile, pkg)
-        }
-        val moonlightPkg = launcher.resolve(AppCatalog.moonlight)
-        moonlightTile?.setAvailable(moonlightPkg != null)
-
-        playStationTile?.let { tile ->
-            val ps = tvInputs.findPlayStation()
-            tile.setSubtitle(if (ps == null) "HDMI 2" else "HDMI 2 · ${ps.stateName}")
-        }
-
         val executor = Executors.newSingleThreadExecutor().also { io = it }
         executor.execute {
-            resolved.forEach { (_, tile, pkg) ->
+            val apps = appTiles.map { (entry, tile) -> tile to launcher.resolve(entry) }
+            val moonlightInstalled = launcher.resolve(AppCatalog.moonlight) != null
+            val inputs = tvInputs.list()
+            val ps = TvInputs.findPlayStation(inputs)
+            val psPort = ps?.parentId ?: TvInputs.PS5_FALLBACK_INPUT
+            val otherPorts = TvInputs.hdmiPorts(inputs).filter { it.id != psPort }
+
+            mainHandler.post {
+                if (isDestroyed) return@post
+                apps.forEach { (tile, pkg) -> tile.setAvailable(pkg != null) }
+                moonlightTile?.setAvailable(moonlightInstalled)
+                playStationInputId = ps?.id ?: TvInputs.PS5_FALLBACK_INPUT
+                otherPorts.forEach { addHdmiTile(it) }
+            }
+
+            apps.forEach { (tile, pkg) ->
+                if (Thread.currentThread().isInterrupted) return@execute
                 val art = pkg?.let { launcher.loadArtwork(it) }
                 mainHandler.post { tile.setArtwork(art?.drawable, art?.isBanner == true) }
             }
         }
         executor.shutdown()
+    }
+
+    private fun addHdmiTile(input: TvInputs.Input) {
+        if (hdmiTiles.containsKey(input.id)) return
+        val label = input.label.ifEmpty { "HDMI" }
+        val tile = Tile(this, APP_W, APP_H).apply {
+            setTitle(label, "Eingang")
+            setOnClickListener { startActivity(InputPlayerActivity.intent(this@MainActivity, input.id, label)) }
+        }
+        hdmiTiles[input.id] = tile
+        devicesRow?.addView(tile)
     }
 
     // ---------------------------------------------------------------- actions
@@ -202,10 +227,12 @@ class MainActivity : Activity() {
         }
     }
 
+    /**
+     * Amazon's input switcher is signature-protected (TUNE_INPUT / LAUNCH_INPUTS), so C3
+     * shows the PS5 itself via TvView. HDMI-CEC One Touch Play keeps working independently.
+     */
     private fun onPlayStation() {
-        // Direct input switching is signature-protected on Fire OS (TUNE_INPUT / LAUNCH_INPUTS).
-        // HDMI-CEC "One Touch Play" switches the TV automatically when the PS5 is turned on.
-        toast("PS5 mit dem Controller einschalten – der TV wechselt automatisch auf HDMI 2")
+        startActivity(InputPlayerActivity.intent(this, playStationInputId, "PlayStation 5"))
     }
 
     private fun toast(message: String) = Toast.makeText(this, message, Toast.LENGTH_LONG).show()

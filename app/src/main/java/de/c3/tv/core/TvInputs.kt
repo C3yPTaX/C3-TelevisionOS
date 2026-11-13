@@ -53,6 +53,17 @@ class TvInputs(private val context: Context) {
         }
     }
 
-    /** The PlayStation as announced via HDMI-CEC (e.g. label "PlayStation 5"), if visible to C3. */
-    fun findPlayStation(): Input? = list().firstOrNull { it.label.contains("PlayStation", ignoreCase = true) }
+    companion object {
+        /** HDMI 2 on the L75MB-FPEU (PS5 port), used if the CEC device is not announced. */
+        const val PS5_FALLBACK_INPUT = "com.mediatek.tis/.HdmiInputService/HW3"
+
+        /** The PlayStation as announced via HDMI-CEC (e.g. label "PlayStation 5"). */
+        fun findPlayStation(inputs: List<Input>): Input? =
+            inputs.firstOrNull { it.label.contains("PlayStation", ignoreCase = true) }
+
+        /** Physical HDMI ports (no CEC child devices), sorted by label. */
+        fun hdmiPorts(inputs: List<Input>): List<Input> =
+            inputs.filter { it.type == TvInputInfo.TYPE_HDMI && it.parentId == null && it.isPassthrough }
+                .sortedBy { it.label }
+    }
 }
