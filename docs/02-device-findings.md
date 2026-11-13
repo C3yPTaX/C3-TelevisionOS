@@ -95,7 +95,7 @@ Fehlende Apps installierst du aus dem Amazon Appstore; danach Paketnamen per `pm
   Vorgelagerter Einstieg `StartAmazonInputActivity` erfordert `com.amazon.tv.inputpreference.permission.LAUNCH_INPUTS` (`signature|privileged`). ❌
   **Fazit: Alle Amazon-Wege zum direkten Eingangswechsel sind für Drittapps gesperrt.** Kein Umgehen ohne Root/Firmware → außerhalb unserer Regeln.
 - **✅ Durchbruch (P0-Diagnose, 2026-11-13): `TvView` funktioniert für Drittapps.** C3 sieht 15 TV-Inputs (inkl. CEC-Gerät „PlayStation 5“, `HDMI20000B`, parent `HW3`) und zeigt das **Live-Bild der PS5 in der eigenen Oberfläche** an (`TvView.tune(inputId, buildChannelUriForPassthroughInput(inputId))`). Ohne Sonderrechte.
-  - Offen: Ton, Eingabeverzögerung (Bildmodus/Game-Mode), Weiterleitung der Fernbedienung per CEC, Verhalten bei Vollbild.
+  - ✅ Ton der PS5 läuft mit. Offen: Eingabeverzögerung (Bildmodus/Game-Mode), Weiterleitung der Fernbedienung per CEC. Umgesetzt als Vollbild-Player `InputPlayerActivity` (P0.1).
   - Der gemeldete Input-Status („Standby“) stimmte nicht mit dem tatsächlichen Zustand (PS5 an) überein → für Statusanzeige nicht verlässlich.
 - **Ausweichwege für die PlayStation-Kachel:** (1) CEC One Touch Play (PS5 schaltet TV selbst um) ✅, (2) Amazons Eingangsauswahl öffnen 🟡, (3) HDMI-Bild per `TvView` in C3 selbst darstellen – plausibel, ungetestet, nur als Experiment 🟡.
 - PlayStation-Kachel: Erkennung über den CEC-Input `HDMI20000B` bzw. dessen Label „PlayStation 5“ via `TvInputManager` (Sichtbarkeit für Drittapps noch zu prüfen).
