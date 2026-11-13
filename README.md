@@ -167,8 +167,10 @@ Add essential settings, benchmark against the Phase 1 baseline, test idle resour
 
 **Easiest: C3 Updater (Windows)**
 
-1. Download `C3-Updater.exe` once from the [`c3-latest` release](https://github.com/C3yPTaX/C3-TelevisionOS/releases/tag/c3-latest).
-2. Start it, enter the TV's IP address, click **TV aktualisieren**. It downloads the newest APK, installs it via ADB and starts C3.
+1. Download the newest `C3-TelevisionOS_vX.Y.Z.zip` from [Releases](https://github.com/C3yPTaX/C3-TelevisionOS/releases/latest) and unzip it (or the development build from the [`c3-latest` pre-release](https://github.com/C3yPTaX/C3-TelevisionOS/releases/tag/c3-latest)).
+2. Start it, enter the TV's IP address, click **TV aktualisieren**. It downloads the newest stable APK (or the development build, if "Entwicklerversion" is ticked), installs it via ADB and starts C3.
+
+Versioning: `VERSION` (x.y.z) is the single source; every new version on `main` becomes one immutable release `vX.Y.Z` (see `AGENTS.md`, `CHANGELOG.md`).
    Requirements: ADB debugging enabled on the TV, `adb` installed (`winget install Google.PlatformTools`).
 
 **Manual**

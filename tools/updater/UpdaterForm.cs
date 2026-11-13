@@ -31,6 +31,7 @@ namespace C3
         readonly RoundButton sunshineButton = new RoundButton();
         readonly Label statusLabel = new Label();
         readonly LinkLabel detailsLink = new LinkLabel();
+        readonly CheckBox devCheck = new CheckBox();
         readonly TextBox log = new TextBox();
 
         TextBox nameBox { get { return nameField.Box; } }
@@ -59,7 +60,7 @@ namespace C3
             var logo = new PictureBox { Location = new Point(Gutter, y), Size = new Size(44, 44), SizeMode = PictureBoxSizeMode.Zoom, BackColor = Theme.Bg };
             try { logo.Image = new Icon(Icon, 48, 48).ToBitmap(); } catch { }
             var title = new Label { Text = "C3 Television OS", Font = Theme.Font(16f, true), ForeColor = Theme.Fg, AutoSize = true, Location = new Point(Gutter + 56, y - 2), BackColor = Theme.Bg };
-            var subtitle = new Label { Text = "Updater", Font = Theme.Font(9.5f, false), ForeColor = Theme.Muted, AutoSize = true, Location = new Point(Gutter + 58, y + 28), BackColor = Theme.Bg };
+            var subtitle = new Label { Text = "Updater · v" + UpdaterVersion, Font = Theme.Font(9.5f, false), ForeColor = Theme.Muted, AutoSize = true, Location = new Point(Gutter + 58, y + 28), BackColor = Theme.Bg };
             tvPill.Height = 26;
             tvPill.Location = new Point(W - Gutter - 150, y + 10);
             tvPill.Anchor = AnchorStyles.Top | AnchorStyles.Right;
@@ -151,7 +152,17 @@ namespace C3
             detailsLink.Font = Theme.Font(9.5f, false);
             detailsLink.Location = new Point(W - Gutter - 104, y);
             detailsLink.LinkClicked += delegate { ToggleDetails(); };
+            devCheck.Text = "Entwicklerversion";
+            devCheck.AutoSize = true;
+            devCheck.ForeColor = Theme.Muted;
+            devCheck.Font = Theme.Font(9f, false);
+            devCheck.Location = new Point(W - Gutter - 104 - 150, y);
+            devCheck.Checked = LoadDevChannel();
+            useDevChannel = devCheck.Checked;
+            devCheck.CheckedChanged += delegate { useDevChannel = devCheck.Checked; SaveDevChannel(useDevChannel); };
+            statusLabel.Size = new Size(290, 22);
             Controls.Add(statusLabel);
+            Controls.Add(devCheck);
             Controls.Add(detailsLink);
             y += 30;
             collapsedHeight = y + 8;
@@ -215,6 +226,26 @@ namespace C3
         {
             b.Text = text;
             b.Primary = primary;
+        }
+
+        bool LoadDevChannel()
+        {
+            try { return System.IO.File.Exists(DevFlagPath()); } catch { return false; }
+        }
+
+        void SaveDevChannel(bool on)
+        {
+            try
+            {
+                if (on) System.IO.File.WriteAllText(DevFlagPath(), "dev");
+                else if (System.IO.File.Exists(DevFlagPath())) System.IO.File.Delete(DevFlagPath());
+            }
+            catch { }
+        }
+
+        string DevFlagPath()
+        {
+            return System.IO.Path.Combine(System.IO.Path.GetDirectoryName(devicesPath), "channel-dev.txt");
         }
 
         void ToggleDetails()
