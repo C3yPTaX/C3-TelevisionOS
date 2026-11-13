@@ -92,7 +92,8 @@ Fehlende Apps installierst du aus dem Amazon Appstore; danach Paketnamen per `pm
   ```
   Vorgelagert: `act=com.amazon.tv.inputpreference.service.action.SWITCH_AMAZON_INPUT` → `.StartAmazonInputActivity`.
   **Ergebnis:** `PassthroughPlayerActivity` ist durch `com.amazon.tv.permission.TUNE_INPUT` geschützt, `protectionLevel: signature|amazon` (ebenso `com.amazon.tv.livetv.permission.TUNE_INPUT`). Selbst ADB (uid 2000) erhält `SecurityException`. → **Direktes Umschalten über Amazons Player ist für Drittapps nicht möglich.** ❌
-  Noch zu prüfen: ob der vorgelagerte Einstieg `SWITCH_AMAZON_INPUT` / `StartAmazonInputActivity` ungeschützt ist. 🟡
+  Vorgelagerter Einstieg `StartAmazonInputActivity` erfordert `com.amazon.tv.inputpreference.permission.LAUNCH_INPUTS` (`signature|privileged`). ❌
+  **Fazit: Alle Amazon-Wege zum direkten Eingangswechsel sind für Drittapps gesperrt.** Kein Umgehen ohne Root/Firmware → außerhalb unserer Regeln.
 - **Ausweichwege für die PlayStation-Kachel:** (1) CEC One Touch Play (PS5 schaltet TV selbst um) ✅, (2) Amazons Eingangsauswahl öffnen 🟡, (3) HDMI-Bild per `TvView` in C3 selbst darstellen – plausibel, ungetestet, nur als Experiment 🟡.
 - PlayStation-Kachel: Erkennung über den CEC-Input `HDMI20000B` bzw. dessen Label „PlayStation 5“ via `TvInputManager` (Sichtbarkeit für Drittapps noch zu prüfen).
 
@@ -108,6 +109,9 @@ Status Smart Inputs: weiterhin **bedingt** (direktes Umschalten über Amazon nic
 | `android.settings.DEVICE_INFO_SETTINGS` | `com.amazon.tv.settings.v2/.tv.device.DeviceActivity` | Systeminfo / Neustart ✅ |
 | `android.settings.BLUETOOTH_SETTINGS` | **kein Ziel** | ❌ → eigene Activity von Amazon suchen |
 | `android.settings.ACCESSIBILITY_SETTINGS` | Platzhalter | ❌ |
+| `com.amazon.tv.settings.action.HDMI_CONTROL_SETTINGS` | `inputpreference…HdmiControlSettingsActivity` | ❌ erfordert `com.amazon.tv.permission.LAUNCHER_SETTINGS` |
+
+> Hinweis: Eine Auflösung per `query-activities` beweist nicht, dass der Start erlaubt ist. Jeder Deep-Link muss per `am start` geprüft werden.
 
 ## 8. Aktualisierte Go/No-Go-Bewertung
 
@@ -124,7 +128,7 @@ Status Smart Inputs: weiterhin **bedingt** (direktes Umschalten über Amazon nic
 
 Siehe Chatverlauf bzw. Abschnitt 8.3 in `01-feasibility-and-architecture.md`:
 
-1. HDMI-Umschaltung per Passthrough-Intent (HW3 und HDMI20000B)
+1. ~~HDMI-Umschaltung~~ → erledigt: über Amazon nicht möglich; `TvView`-Experiment folgt mit Test-APK
 2. Start der drei vorhandenen Apps inkl. Kaltstartzeit
 3. Welche Activity öffnet für Bild-, Ton- und Bluetooth-Einstellungen
 4. Moonlight-Installation und Latenzmessung
