@@ -32,6 +32,8 @@ Create a clean, responsive and distraction-free Smart TV experience, visually in
 
 Hardware details, Android API level, permissions and firmware restrictions must be verified on-device during Phase 1.
 
+**Phase 1 documents:** [Feasibility & architecture (DE)](docs/01-feasibility-and-architecture.md) · read-only device collector: [`tools/adb/collect-device-info.sh`](tools/adb/collect-device-info.sh)
+
 ## Scope: v1.0
 
 ### 1. C3 Home
@@ -160,6 +162,29 @@ Add essential settings, benchmark against the Phase 1 baseline, test idle resour
 - Essential settings remain reachable, directly or through system settings
 - Measured and acceptable startup, resource use and navigation responsiveness
 - Safe, documented return to the stock launcher and TV behavior
+
+## Prototype: install & update
+
+**Easiest: C3 Updater (Windows)**
+
+1. Download `C3-Updater.exe` once from the [`c3-latest` release](https://github.com/C3yPTaX/C3-TelevisionOS/releases/tag/c3-latest).
+2. Start it, enter the TV's IP address, click **TV aktualisieren**. It downloads the newest APK, installs it via ADB and starts C3.
+   Requirements: ADB debugging enabled on the TV, `adb` installed (`winget install Google.PlatformTools`).
+
+**Manual**
+
+```
+adb connect <tv-ip>:5555
+adb install -r c3-tv.apk
+adb shell am start -n de.c3.tv/.MainActivity
+```
+
+- On C3 Home press **☰ (Menu)** for the diagnostics screen.
+- Remove completely: `adb uninstall de.c3.tv`
+
+The C3 Updater also detects this PC (Windows, GPU/encoder, network) and can install **Sunshine** via winget (`LizardByte.Sunshine`) for C3 Desktop.
+
+The APK is signed with a **development key committed to the repo** (`app/dev.keystore`) so CI builds can be updated in place. It must be replaced by a private key before any public release. The updater icon is taken from the author's C3-MetinVision project. The TV UI bundles the Inter typeface (SIL Open Font License, see `third_party/inter/OFL.txt`).
 
 ## Development workflow
 

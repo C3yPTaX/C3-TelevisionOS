@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Static background: base colour + two soft light glows (no animation, drawn once). -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape><solid android:color="@color/c3_bg" /></shape>
+    </item>
+    <item>
+        <shape>
+            <gradient
+                android:centerX="0.18"
+                android:centerY="0.05"
+                android:endColor="#001D2A3F"
+                android:gradientRadius="560dp"
+                android:startColor="@color/c3_glow_primary"
+                android:type="radial" />
+        </shape>
+    </item>
+    <item>
+        <shape>
+            <gradient
+                android:centerX="0.95"
+                android:centerY="1.0"
+                android:endColor="#00161A2A"
+                android:gradientRadius="420dp"
+                android:startColor="@color/c3_glow_secondary"
+                android:type="radial" />
+        </shape>
+    </item>
+</layer-list>

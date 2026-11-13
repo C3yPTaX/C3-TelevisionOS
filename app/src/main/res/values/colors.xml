@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- C3 Television OS design tokens (docs/04-design-proposal.md) -->
+    <color name="c3_bg">#FF0A0B0F</color>
+    <color name="c3_glow_primary">#FF1D2A3F</color>
+    <color name="c3_glow_secondary">#FF161A2A</color>
+    <color name="c3_tile_top">#FF232833</color>
+    <color name="c3_tile_bottom">#FF15181E</color>
+    <color name="c3_glass_top">#1AFFFFFF</color>
+    <color name="c3_glass_bottom">#0AFFFFFF</color>
+    <color name="c3_glass_edge">#38FFFFFF</color>
+    <color name="c3_hairline">#14FFFFFF</color>
+    <color name="c3_focus_ring">#D9FFFFFF</color>
+    <color name="c3_gloss">#38FFFFFF</color>
+    <color name="c3_text">#FFF2F4F7</color>
+    <color name="c3_text_secondary">#9EF2F4F7</color>
+    <color name="c3_text_tertiary">#61F2F4F7</color>
+    <color name="c3_text_on_light">#FF0A0B0F</color>
+    <color name="c3_accent">#FF5AA9FF</color>
+    <color name="c3_accent_glow">#995AA9FF</color>
+    <color name="c3_ok">#FF34C77B</color>
+    <color name="c3_ok_text">#FF8EE0A8</color>
+    <color name="c3_ok_bg">#2434C77B</color>
+    <color name="c3_chip_bg">#14FFFFFF</color>
+    <color name="c3_dock_focus">#F2FFFFFF</color>
+    <color name="c3_tile">#FF262A33</color>
+</resources>

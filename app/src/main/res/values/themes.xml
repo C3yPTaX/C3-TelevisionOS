@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.C3" parent="@android:style/Theme.DeviceDefault.NoActionBar.Fullscreen">
+        <item name="android:windowBackground">@drawable/bg_home</item>
+        <item name="android:colorAccent">@color/c3_accent</item>
+        <item name="android:textColor">@color/c3_text</item>
+        <item name="android:fontFamily">@font/inter_medium</item>
+    </style>
+</resources>
