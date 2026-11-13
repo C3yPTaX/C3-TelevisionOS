@@ -2,6 +2,17 @@
 
 Nur die wesentlichen Änderungen. Version: Datei `VERSION` (x.y.z).
 
+## 0.6.0
+
+- Neu: „An C3 TV senden“ – Links vom iPhone (Teilen-Menü, App „Kurzbefehle“) öffnen sich
+  direkt in Silk auf dem TV. Nur aktiv, solange „Privat“ an ist; geschützt durch einen
+  geheimen Code; keine Speicherung gesendeter Links.
+- TV ist im Heimnetz als `c3tv.local` erreichbar (IP-Wechsel egal); Ersatzseite unter
+  `http://c3tv.local:8765` zum Einfügen eines Links von jedem Gerät.
+- Updater: „iPhone einrichten“ mit Schritt-für-Schritt-Anleitung, Adresse und Code zum
+  Kopieren; „Neuen Code erzeugen“.
+- Diagnose-Seite zeigt, ob der Link-Empfang aktiv ist.
+
 ## 0.5.0
 
 - TV: neue Reihe „Web“ mit Browser-Kachel (Amazon Silk).

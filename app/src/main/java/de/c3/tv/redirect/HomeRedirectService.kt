@@ -8,6 +8,7 @@ import android.provider.Settings
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import de.c3.tv.MainActivity
+import de.c3.tv.remote.LinkReceiver
 
 /**
  * Optional HOME redirect (off by default).
@@ -30,6 +31,7 @@ class HomeRedirectService : AccessibilityService() {
 
     override fun onServiceConnected() {
         super.onServiceConnected()
+        LinkReceiver.onServiceConnected(this)
         if (SystemClock.elapsedRealtime() < BOOT_WINDOW_MS) {
             Log.i(TAG, "Connected shortly after boot – opening C3")
             openC3()
@@ -85,6 +87,16 @@ class HomeRedirectService : AccessibilityService() {
     }
 
     override fun onInterrupt() = Unit
+
+    override fun onUnbind(intent: Intent?): Boolean {
+        LinkReceiver.onServiceDisconnected()
+        return super.onUnbind(intent)
+    }
+
+    override fun onDestroy() {
+        LinkReceiver.onServiceDisconnected()
+        super.onDestroy()
+    }
 
     companion object {
         private const val TAG = "C3HomeRedirect"

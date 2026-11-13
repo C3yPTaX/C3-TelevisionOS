@@ -97,6 +97,7 @@ class DiagnosticsActivity : Activity() {
         sb.appendLine("RAM frei: ${mem.availMem / MB} MB von ${mem.totalMem / MB} MB · lowMemory=${mem.lowMemory}")
         sb.appendLine("C3 Speicher (PSS): ${own.totalPss / 1024} MB")
         sb.appendLine("Home-Umleitung: " + if (HomeRedirectService.isEnabled(this)) "aktiv" else "aus")
+        sb.appendLine("Link-Empfang: " + if (de.c3.tv.remote.LinkReceiver.isRunning) "aktiv (c3tv.local:${de.c3.tv.remote.LinkReceiver.PORT})" else "aus")
         sb.appendLine()
         sb.appendLine("Sichtbare TV-Inputs: ${inputs.size}")
         inputs.forEach {

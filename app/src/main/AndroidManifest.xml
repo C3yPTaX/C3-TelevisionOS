@@ -2,6 +2,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-feature android:name="android.software.leanback" android:required="false" />
+
+    <!-- "An C3 TV senden": local link receiver + c3tv.local name (only while Privat is on). -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
 
     <!-- Android 11 package visibility: only the apps C3 actually launches. -->

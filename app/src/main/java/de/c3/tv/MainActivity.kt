@@ -31,6 +31,7 @@ import de.c3.tv.core.dp
 import de.c3.tv.feature.diagnostics.DiagnosticsActivity
 import de.c3.tv.feature.inputs.InputPlayerActivity
 import de.c3.tv.redirect.HomeRedirectService
+import de.c3.tv.remote.LinkReceiver
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
@@ -94,7 +95,12 @@ class MainActivity : Activity() {
     private fun handleConfigIntent(intent: Intent?): Boolean {
         if (intent?.action == WebStore.ACTION_SET_PRIVATE) {
             val enabled = intent.getBooleanExtra(WebStore.EXTRA_ENABLED, false)
-            val sites = webStore.apply(enabled, intent.getStringExtra(WebStore.EXTRA_SITES).orEmpty())
+            val sites = webStore.apply(
+                enabled,
+                intent.getStringExtra(WebStore.EXTRA_SITES).orEmpty(),
+                intent.getStringExtra(WebStore.EXTRA_TOKEN),
+            )
+            LinkReceiver.update(this)
             toast(if (enabled) "Privat: ${sites.size} Seiten" else "Privat ausgeschaltet")
             return true
         }

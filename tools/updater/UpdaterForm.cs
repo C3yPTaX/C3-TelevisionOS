@@ -34,6 +34,7 @@ namespace C3
         readonly RoundButton addSiteButton = new RoundButton();
         readonly RoundButton privateOnButton = new RoundButton();
         readonly RoundButton privateOffButton = new RoundButton();
+        readonly RoundButton iphoneButton = new RoundButton();
         readonly Pill sunshinePill = new Pill();
         readonly Label sysValues = new Label();
         readonly RoundButton sunshineButton = new RoundButton();
@@ -124,7 +125,7 @@ namespace C3
             y += 132 + 14;
 
             // ---------------------------------------------------------------- Privat
-            var priv = NewCard(y, 176);
+            var priv = NewCard(y, 220);
             priv.Controls.Add(CardLabel("Privat", 16, 12));
             privatePill.Height = 22;
             privatePill.Location = new Point(CardW - 16 - 60, 12);
@@ -145,7 +146,10 @@ namespace C3
             Setup(privateOffButton, "Privat aus + Silk-Verlauf löschen", false);
             Place(priv, privateOffButton, 292, 126, 264, 36);
             privateOffButton.Click += delegate { RunAsync(Job.PrivateOff); };
-            y += 176 + 14;
+            Setup(iphoneButton, "iPhone einrichten – Links ans TV senden", false);
+            Place(priv, iphoneButton, 16, 170, 540, 36);
+            iphoneButton.Click += delegate { ShowIphoneSetup(); };
+            y += 220 + 14;
 
             // ---------------------------------------------------------------- Sunshine
             var sun = NewCard(y, 186);
