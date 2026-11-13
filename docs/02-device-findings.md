@@ -83,7 +83,15 @@ Fehlende Apps installierst du aus dem Amazon Appstore; danach Paketnamen per `pm
 
 - HDMI-CEC ist am TV **aktiv** (`mHdmiControlEnabled: true`, Auto-Wakeup an).
 - Der TV fragt den Ein/Aus-Status der PS5 regelmäßig per CEC ab (`Give Device Power Status`) – PS5-Status ist damit systemseitig bekannt.
-- **Passthrough-Intent wird angenommen:** `content://android.media.tv/passthrough/...` löst auf `com.amazon.tv.livetv/.TvChannelsPlayerActivityAlias` auf. Direktes Umschalten aus C3 ist damit **sehr wahrscheinlich** möglich (Praxistest ausstehend).
+- **Android-Standard-Passthrough schaltet NICHT um:** `content://android.media.tv/passthrough/...` öffnet nur die Live-TV-Oberfläche (`com.amazon.tv.livetv`, ggf. mit Auswahldialog Vewd/Live TV). ❌
+- **Amazons eigener Weg (per logcat beobachtet beim manuellen Umschalten auf HDMI 2):**
+  ```
+  act=android.intent.action.VIEW
+  dat=tvinput://tunenow?inputId=com.mediatek.tis/.HdmiInputService/HW3&suppressInputTuneNotification=false&refTag=null
+  cmp=com.amazon.tv.inputpreference.service/com.amazon.tv.inputpreference.player.PassthroughPlayerActivity
+  ```
+  Vorgelagert: `act=com.amazon.tv.inputpreference.service.action.SWITCH_AMAZON_INPUT` → `.StartAmazonInputActivity`.
+  Offen: Aufruf per ADB und **Exportstatus/Berechtigungen** für Drittapps. 🟡
 - PlayStation-Kachel: Erkennung über den CEC-Input `HDMI20000B` bzw. dessen Label „PlayStation 5“ via `TvInputManager` (Sichtbarkeit für Drittapps noch zu prüfen).
 
 Status Smart Inputs: von **bedingt** → **GO (vorbehaltlich Praxistest)**.
