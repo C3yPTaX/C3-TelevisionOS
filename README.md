@@ -182,7 +182,9 @@ adb shell am start -n de.c3.tv/.MainActivity
 - On C3 Home press **☰ (Menu)** for the diagnostics screen.
 - Remove completely: `adb uninstall de.c3.tv`
 
-The APK is signed with a **development key committed to the repo** (`app/dev.keystore`) so CI builds can be updated in place. It must be replaced by a private key before any public release. The updater icon is taken from the author's C3-MetinVision project.
+The C3 Updater also detects this PC (Windows, GPU/encoder, network) and can install **Sunshine** via winget (`LizardByte.Sunshine`) for C3 Desktop.
+
+The APK is signed with a **development key committed to the repo** (`app/dev.keystore`) so CI builds can be updated in place. It must be replaced by a private key before any public release. The updater icon is taken from the author's C3-MetinVision project. The TV UI bundles the Inter typeface (SIL Open Font License, see `third_party/inter/OFL.txt`).
 
 ## Development workflow
 
