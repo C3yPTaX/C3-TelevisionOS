@@ -2,6 +2,17 @@
 
 Nur die wesentlichen Änderungen. Version: Datei `VERSION` (x.y.z).
 
+## 0.5.0
+
+- TV: neue Reihe „Web“ mit Browser-Kachel (Amazon Silk).
+- TV: privater Bereich – Reihe „Privat“ mit eigenen Seiten, nur sichtbar, wenn im Updater eingeschaltet.
+  Ausgeschaltet speichert der TV nichts davon.
+- TV: Reihen scrollen senkrecht, Titelbereich und Systemleiste bleiben fest.
+- Updater: Karte „Privat“ – Seiten verwalten (auf dem PC verschlüsselt gespeichert),
+  „Privat an“ (Silk aktivieren, Seiten senden), „Privat aus“ (Reihe entfernen,
+  Silk-Daten löschen, Silk deaktivieren; bei Systempaket nur Daten löschen).
+- Updater: Fenster passt sich an kleine/skalierte Bildschirme an (scrollt bei Bedarf).
+
 ## 0.4.0
 
 - Erste versionierte Ausgabe von C3 Television OS.

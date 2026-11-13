@@ -168,7 +168,7 @@ namespace C3
 
         // ------------------------------------------------------------------ workflow
 
-        enum Job { Update, Start, RedirectOn, RedirectOff, AddPc, RemovePc, InstallSunshine }
+        enum Job { Update, Start, RedirectOn, RedirectOff, AddPc, RemovePc, InstallSunshine, PrivateOn, PrivateOff }
 
         void RunAsync(Job job)
         {
@@ -195,6 +195,8 @@ namespace C3
                         case Job.AddPc: DoAddThisPc(ip); break;
                         case Job.RemovePc: DoRemovePc(ip); break;
                         case Job.InstallSunshine: DoInstallSunshine(); break;
+                        case Job.PrivateOn: DoPrivate(ip, true); break;
+                        case Job.PrivateOff: DoPrivate(ip, false); break;
                     }
                 }
                 catch (Exception e)

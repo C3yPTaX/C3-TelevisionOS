@@ -19,9 +19,14 @@
         <package android:name="com.limelight" />
         <package android:name="com.amazon.tv.launcher" />
         <package android:name="com.amazon.tv.settings.v2" />
+        <package android:name="com.amazon.cloud9" />
 
         <intent>
             <action android:name="android.settings.SETTINGS" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" />
         </intent>
         <intent>
             <action android:name="android.settings.WIFI_SETTINGS" />

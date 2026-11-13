@@ -13,6 +13,7 @@ import android.widget.FrameLayout
 import android.widget.HorizontalScrollView
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextClock
 import android.widget.TextView
 import android.widget.Toast
@@ -25,6 +26,7 @@ import de.c3.tv.core.PcStore
 import de.c3.tv.core.SystemShortcuts
 import de.c3.tv.core.Tile
 import de.c3.tv.core.TvInputs
+import de.c3.tv.core.WebStore
 import de.c3.tv.core.dp
 import de.c3.tv.feature.diagnostics.DiagnosticsActivity
 import de.c3.tv.feature.inputs.InputPlayerActivity
@@ -52,6 +54,11 @@ class MainActivity : Activity() {
     private var devicesRow: LinearLayout? = null
     private val hdmiTiles = mutableMapOf<String, Tile>()
 
+    private lateinit var webStore: WebStore
+    private var browserTile: Tile? = null
+    private var privateTitle: View? = null
+    private var privateRow: LinearLayout? = null
+    private var privateScroll: View? = null
     private lateinit var shelfCategory: TextView
     private lateinit var shelfTitle: TextView
 
@@ -63,9 +70,11 @@ class MainActivity : Activity() {
         launcher = AppLauncher(this)
         tvInputs = TvInputs(this)
         pcStore = PcStore(this)
+        webStore = WebStore(this)
         setContentView(buildLayout())
         handleConfigIntent(intent)
         rebuildPcTiles()
+        rebuildPrivateTiles()
         appTiles.firstOrNull()?.second?.let { first ->
             first.requestFocus()
             showShelf(first.shelfCategory, first.shelfTitle)
@@ -75,11 +84,20 @@ class MainActivity : Activity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        if (handleConfigIntent(intent)) rebuildPcTiles()
+        if (handleConfigIntent(intent)) {
+            rebuildPcTiles()
+            rebuildPrivateTiles()
+        }
     }
 
     /** PC list pushed by the C3 Updater via adb (see PcStore). */
     private fun handleConfigIntent(intent: Intent?): Boolean {
+        if (intent?.action == WebStore.ACTION_SET_PRIVATE) {
+            val enabled = intent.getBooleanExtra(WebStore.EXTRA_ENABLED, false)
+            val sites = webStore.apply(enabled, intent.getStringExtra(WebStore.EXTRA_SITES).orEmpty())
+            toast(if (enabled) "Privat: ${sites.size} Seiten" else "Privat ausgeschaltet")
+            return true
+        }
         if (intent?.action != PcStore.ACTION_SET_PCS) return false
         val pcs = pcStore.save(intent.getStringExtra(PcStore.EXTRA_PCS).orEmpty())
         toast(if (pcs.isEmpty()) "C3 Desktop: keine PCs gespeichert" else "C3 Desktop: " + pcs.joinToString { it.name })
@@ -123,8 +141,30 @@ class MainActivity : Activity() {
         column.addView(buildHeader())
         column.addView(buildShelf())
 
-        column.addView(sectionTitle("Apps"))
-        column.addView(row(AppCatalog.streaming.map { entry ->
+        // Rows scroll vertically (focus-driven) and end above the dock.
+        val rows = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            clipChildren = false
+            clipToPadding = false
+            setPadding(dp(12), dp(2), dp(12), dp(10))
+        }
+        // The scroll view itself clips (rows must not paint over the title area when scrolled);
+        // padding inside leaves room for the focus scale.
+        val rowScroll = ScrollView(this).apply {
+            isVerticalScrollBarEnabled = false
+            isFocusable = false
+            overScrollMode = View.OVER_SCROLL_NEVER
+            isSmoothScrollingEnabled = true
+            addView(rows)
+        }
+        column.addView(rowScroll, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f).apply {
+            leftMargin = -dp(12)
+            rightMargin = -dp(12)
+            bottomMargin = dp(48)
+        })
+
+        rows.addView(sectionTitle("Apps"))
+        rows.addView(row(AppCatalog.streaming.map { entry ->
             Tile(this, Tile.Style.APP).also { tile ->
                 tile.setTitle(entry.title)
                 tile.shelfCategory = "Streaming"
@@ -135,7 +175,7 @@ class MainActivity : Activity() {
             }
         }))
 
-        column.addView(sectionTitle("Geräte"))
+        rows.addView(sectionTitle("Geräte"))
         val ps = deviceTile("PlayStation 5", R.drawable.ic_gamepad, "Konsole · HDMI 2").apply {
             setChip("HDMI 2", ok = true)
             setOnClickListener { onPlayStation() }
@@ -143,7 +183,23 @@ class MainActivity : Activity() {
         playStationTile = ps
         val devices = row(listOf(ps))
         devicesRow = (devices as HorizontalScrollView).getChildAt(0) as LinearLayout
-        column.addView(devices)
+        rows.addView(devices)
+
+        rows.addView(sectionTitle("Web"))
+        val browser = deviceTile("Browser", R.drawable.ic_globe, "Web · Silk").apply {
+            setChip("Silk", ok = false)
+            setOnClickListener { launchApp(WebStore.silk, hint = "Silk Browser im Amazon Appstore installieren") }
+        }
+        browserTile = browser
+        rows.addView(row(listOf(browser)))
+
+        val pTitle = sectionTitle("Privat")
+        val pRow = row(emptyList())
+        privateTitle = pTitle
+        privateScroll = pRow
+        privateRow = (pRow as HorizontalScrollView).getChildAt(0) as LinearLayout
+        rows.addView(pTitle)
+        rows.addView(pRow)
 
         return FrameLayout(this).apply {
             clipChildren = false
@@ -193,7 +249,7 @@ class MainActivity : Activity() {
     private fun buildShelf(): View = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
         gravity = Gravity.BOTTOM
-        layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(112))
+        layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(100))
         shelfCategory = TextView(context).apply {
             textSize = 11f
             typeface = C3Fonts.medium(context)
@@ -291,6 +347,7 @@ class MainActivity : Activity() {
         executor.execute {
             val apps = appTiles.map { (entry, tile) -> tile to launcher.resolve(entry) }
             val moonlightInstalled = launcher.resolve(AppCatalog.moonlight) != null
+            val silkAvailable = launcher.resolve(WebStore.silk) != null
             val inputs = tvInputs.list()
             val ps = TvInputs.findPlayStation(inputs)
             val psPort = ps?.parentId ?: TvInputs.PS5_FALLBACK_INPUT
@@ -304,6 +361,7 @@ class MainActivity : Activity() {
                 if (tile.isFocused) showShelf(tile.shelfCategory, tile.shelfTitle)
             }
                 this.moonlightInstalled = moonlightInstalled
+                browserTile?.setAvailable(silkAvailable)
                 pcTiles.forEach { it.setAvailable(moonlightInstalled) }
                 playStationInputId = ps?.id ?: TvInputs.PS5_FALLBACK_INPUT
                 otherPorts.forEach { addHdmiTile(it) }
@@ -345,6 +403,27 @@ class MainActivity : Activity() {
         pcTiles.forEachIndexed { i, tile ->
             tile.setAvailable(moonlightInstalled)
             row.addView(tile, 1 + i)
+        }
+    }
+
+    /** Private row exists only while the area is switched on in the C3 Updater. */
+    private fun rebuildPrivateTiles() {
+        val row = privateRow ?: return
+        row.removeAllViews()
+        val sites = webStore.privateSites()
+        val visible = if (sites.isEmpty()) View.GONE else View.VISIBLE
+        privateTitle?.visibility = visible
+        privateScroll?.visibility = visible
+        sites.forEach { site ->
+            row.addView(deviceTile(site.name, R.drawable.ic_globe, "Privat").apply {
+                setOnClickListener { openUrl(site.url) }
+            })
+        }
+    }
+
+    private fun openUrl(url: String) {
+        if (WebStore.openIntents(url).none { launcher.start(it) }) {
+            toast("Kein Browser verfügbar – Silk im Amazon Appstore installieren")
         }
     }
 
