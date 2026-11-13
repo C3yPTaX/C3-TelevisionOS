@@ -32,6 +32,8 @@ Create a clean, responsive and distraction-free Smart TV experience, visually in
 
 Hardware details, Android API level, permissions and firmware restrictions must be verified on-device during Phase 1.
 
+**Phase 1 documents:** [Feasibility & architecture (DE)](docs/01-feasibility-and-architecture.md) · read-only device collector: [`tools/adb/collect-device-info.sh`](tools/adb/collect-device-info.sh)
+
 ## Scope: v1.0
 
 ### 1. C3 Home
