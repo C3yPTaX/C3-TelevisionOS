@@ -124,6 +124,17 @@ Status Smart Inputs: weiterhin **bedingt** (direktes Umschalten über Amazon nic
 
 Zielwert C3 Home: Kaltstart **< 500 ms**.
 
+## 7b. Windows-Hosts (Angaben Nutzer)
+
+| Gerät | GPU | Netzwerk | Sunshine-Encoder | WoL |
+| --- | --- | --- | --- | --- |
+| Gaming-PC | RTX 4060 Ti (Ada) | LAN oder WLAN | NVENC H.264/HEVC/**AV1** ✅ | ✅ nur per **LAN** zuverlässig |
+| Laptop | RTX 5060 Laptop (Blackwell, Bezeichnung zu bestätigen) | LAN oder WLAN | NVENC H.264/HEVC/AV1 ✅ | 🟡 nur am LAN, eingeschränkt (Akku, Deckel, Dock) |
+
+- Codec-Strategie: **HEVC** als Standard (am ausgereiftesten), **AV1** als Test – beide decodiert der TV in Hardware mit `low-latency`.
+- Laptop mit Hybridgrafik (iGPU + RTX): Sunshine-Capture hängt davon ab, welche GPU das Display treibt → ggf. MUX-Schalter/„dGPU only“ nötig. 🟡
+- Bester Pfad: Host per LAN; TV-Anbindung (WLAN/LAN) noch zu klären.
+
 ## 8. Aktualisierte Go/No-Go-Bewertung
 
 | Modul | vorher | jetzt |
