@@ -11,8 +11,8 @@ android {
         applicationId = "de.c3.tv"
         minSdk = 30 // Fire OS 8 = Android 11
         targetSdk = 35
-        versionCode = 4
-        versionName = "0.3.0-p2"
+        versionCode = 5
+        versionName = "0.3.1-p2"
     }
 
     signingConfigs {

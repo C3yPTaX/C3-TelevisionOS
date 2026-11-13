@@ -13,53 +13,68 @@ import de.c3.tv.MainActivity
  * Optional HOME redirect (off by default).
  *
  * Fire OS does not allow third-party launchers, so Amazon's launcher stays the system
- * home. This service only receives TYPE_WINDOW_STATE_CHANGED events of the Amazon
- * launcher package (see res/xml/home_redirect_service.xml) and brings C3 Home to the
- * front when Amazon's home screen appears. It reads no window content.
+ * home. This service only receives TYPE_WINDOW_STATE_CHANGED events (no window content)
+ * and brings C3 Home to the front when Amazon's home screen appears.
  *
- * Escape hatch: pressing HOME again within [ESCAPE_WINDOW_MS] after a redirect keeps
- * Amazon's home screen (e.g. for profiles, the app store or Amazon's own menus).
+ * - Escape: a second HOME press within [ESCAPE_WINDOW_MS] after a redirect keeps Amazon
+ *   home. The escape lasts until any other app (or C3) comes to the front.
+ * - Boot: Amazon home is usually shown before this service is connected, so C3 is opened
+ *   once when the service connects shortly after boot.
  *
- * Enable/disable via ADB (Fire OS hides the accessibility settings page):
- *   adb shell settings put secure enabled_accessibility_services de.c3.tv/de.c3.tv.redirect.HomeRedirectService
- *   adb shell settings put secure accessibility_enabled 1
- * The C3 Updater has buttons for both directions.
+ * Enable/disable via ADB or the C3 Updater (Fire OS hides the accessibility settings page).
  */
 class HomeRedirectService : AccessibilityService() {
 
     private var lastRedirectAt = 0L
-    private var escapedUntil = 0L
+    private var escaped = false
+
+    override fun onServiceConnected() {
+        super.onServiceConnected()
+        if (SystemClock.elapsedRealtime() < BOOT_WINDOW_MS) {
+            Log.i(TAG, "Connected shortly after boot – opening C3")
+            openC3()
+        }
+    }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null || event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
-        if (event.packageName?.toString() != AMAZON_LAUNCHER) return
+        val pkg = event.packageName?.toString() ?: return
         val className = event.className?.toString().orEmpty()
-        Log.d(TAG, "Amazon launcher window: $className")
+
+        if (pkg != AMAZON_LAUNCHER) {
+            // Any real app (or C3 itself) in front ends an escape. System overlays don't count.
+            if (escaped && pkg !in IGNORED_PACKAGES) {
+                escaped = false
+                Log.d(TAG, "Escape ended by $pkg")
+            }
+            return
+        }
+
+        Log.d(TAG, "Amazon launcher window: $className (escaped=$escaped)")
         if (!className.contains(HOME_ACTIVITY_MARKER)) return
+        if (escaped) return
 
         val now = SystemClock.elapsedRealtime()
         val sinceRedirect = now - lastRedirectAt
-        when {
-            // Duplicate event of the same HOME press.
-            sinceRedirect < DUPLICATE_WINDOW_MS -> return
-            // User escaped to Amazon home recently: leave it alone for a while.
-            now < escapedUntil -> return
-            // Second HOME press shortly after a redirect: stay on Amazon home.
-            sinceRedirect < ESCAPE_WINDOW_MS -> {
-                escapedUntil = now + ESCAPE_HOLD_MS
-                Log.i(TAG, "Escape to Amazon home")
-                return
-            }
+        if (sinceRedirect < DUPLICATE_WINDOW_MS) return // same HOME press
+        if (sinceRedirect < ESCAPE_WINDOW_MS) {
+            escaped = true
+            Log.i(TAG, "Escape to Amazon home")
+            return
         }
 
         lastRedirectAt = now
+        openC3()
+    }
+
+    private fun openC3() {
         try {
             startActivity(
                 Intent(this, MainActivity::class.java)
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
             )
         } catch (e: Exception) {
-            Log.w(TAG, "Redirect failed", e)
+            Log.w(TAG, "Opening C3 failed", e)
         }
     }
 
@@ -70,8 +85,15 @@ class HomeRedirectService : AccessibilityService() {
         const val AMAZON_LAUNCHER = "com.amazon.tv.launcher"
         private const val HOME_ACTIVITY_MARKER = "HomeActivity"
         private const val DUPLICATE_WINDOW_MS = 400L
-        private const val ESCAPE_WINDOW_MS = 2000L
-        private const val ESCAPE_HOLD_MS = 60_000L
+        private const val ESCAPE_WINDOW_MS = 1200L
+        private const val BOOT_WINDOW_MS = 5 * 60_000L
+        private val IGNORED_PACKAGES = setOf(
+            "android",
+            "com.android.systemui",
+            "com.amazon.tv.ime",
+            "com.amazon.tv.quicksettings.ui",
+            "com.amazon.tv.quicksettings",
+        )
 
         /** True if this service is listed in the enabled accessibility services. */
         fun isEnabled(context: Context): Boolean {
@@ -79,7 +101,8 @@ class HomeRedirectService : AccessibilityService() {
                 context.contentResolver,
                 Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES,
             ).orEmpty()
-            return enabled.split(':').any { it.equals("${context.packageName}/${HomeRedirectService::class.java.name}", ignoreCase = true) }
+            val me = "${context.packageName}/${HomeRedirectService::class.java.name}"
+            return enabled.split(':').any { it.equals(me, ignoreCase = true) }
         }
     }
 }
