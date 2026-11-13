@@ -112,6 +112,11 @@ Status Smart Inputs: weiterhin **bedingt** (direktes Umschalten über Amazon nic
 | `android.settings.ACCESSIBILITY_SETTINGS` | Platzhalter | ❌ |
 | `com.amazon.tv.settings.action.HDMI_CONTROL_SETTINGS` | `inputpreference…HdmiControlSettingsActivity` | ❌ erfordert `com.amazon.tv.permission.LAUNCHER_SETTINGS` |
 
+| Bild/Ton-Seite (manuell geöffnet) | `com.amazon.tv.quicksettings.ui/.view.FullScreenSettingsActivity` | ❌ erfordert `com.amazon.tv.permission.LAUNCHER_SETTINGS` |
+
+- Bildeinstellungen (Modus, Helligkeit, Kontrast) sind im Hauptmenü nicht verfügbar, nur kontextbezogen während eine Quelle läuft (Schnelleinstellungen: HOME lang drücken).
+- **Fazit Control Center:** Direkt aus C3 öffnbar sind *Einstellungen*, *Netzwerk*, *Geräteinfo*. Bild/Ton nur über Amazons Schnelleinstellungen (HOME lang). Lautstärke über `AudioManager`.
+
 > Hinweis: Eine Auflösung per `query-activities` beweist nicht, dass der Start erlaubt ist. Jeder Deep-Link muss per `am start` geprüft werden.
 
 ## 7a. Baseline: Kaltstartzeiten (`am start -S -W`)
@@ -144,7 +149,7 @@ Zielwert C3 Home: Kaltstart **< 500 ms**.
 | C3 Desktop | GO 1080p60 | **GO**, 4K60 HEVC/AV1 hardwareseitig möglich, Low-Latency-Decoder vorhanden |
 | C3 Smart Inputs | bedingt | **bedingt** – PS5 per CEC erkannt; Amazons Umschalt-Player ist signaturgeschützt (`TUNE_INPUT`), Ausweichwege in Prüfung |
 | C3 Remote Power | GO | GO (unverändert, PC-Seite offen) |
-| C3 Control Center | teilweise | teilweise – WLAN/Bild/Ton/Info als Deep-Link; Bluetooth offen |
+| C3 Control Center | teilweise | **reduziert** – Lautstärke, Einstellungen, Netzwerk, Geräteinfo, Systeminfo; Bild/Ton nur über Amazon-Schnelleinstellungen; Bluetooth offen |
 
 ## 9. Offene Praxistests
 
@@ -152,5 +157,5 @@ Siehe Chatverlauf bzw. Abschnitt 8.3 in `01-feasibility-and-architecture.md`:
 
 1. ~~HDMI-Umschaltung~~ → erledigt: über Amazon nicht möglich; `TvView`-Experiment folgt mit Test-APK
 2. ~~Kaltstartzeiten~~ → erledigt (Abschnitt 7a)
-3. Welche Activity öffnet für Bild-, Ton- und Bluetooth-Einstellungen
+3. ~~Bild/Ton~~ → gesperrt (`LAUNCHER_SETTINGS`); Bluetooth-Seite noch offen
 4. Moonlight-Installation und Latenzmessung
