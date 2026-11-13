@@ -1,6 +1,6 @@
 # C3 Television OS – Designvorschlag & Umsetzungsplan
 
-> Status: **Vorschlag, wartet auf Freigabe.** Visuelle Vorschau: Design-Canvas (Homescreen, Designsystem, Updater).
+> Status: **Freigegeben (2026-11-13).** Akzent C3-Blau, Name „C3 Television OS“, Sunshine-Installation per winget. Visuelle Vorschau: Design-Canvas (Homescreen, Designsystem, Updater).
 > Umsetzung nach Freigabe auf eigenem Branch (`claude/design-refresh`).
 
 ## 1. Ist-Analyse der Oberfläche
@@ -26,7 +26,7 @@ Logik (App-Start, PCs, PS5-Player, HDMI, Home-Umleitung, Diagnose) bleibt **unve
 - **Oberer Bereich („Top Shelf“):** großer Titel + Kategorie der fokussierten Kachel, 160 ms Überblendung.
 - **Bewegung:** nur bei Eingabe; im Leerlauf keine Animation.
 - **Symbole:** eigene Strich-Symbole (Controller, Monitor, HDMI, Zahnrad, WLAN, Bluetooth, Info, Haus). Keine Apple-Symbole, -Schriften, -Hintergründe.
-- **Name:** „C3 Television OS“, Zusatz „by Nico Lukowski“ dezent unten rechts und im Updater.
+- **Name:** „C3 Television OS“; der Zusatz des Autors erscheint ausschließlich dezent auf dem TV-Homescreen (unten rechts), nirgends sonst.
 
 ## 3. Liquid Glass – was auf diesem TV geht
 
@@ -48,7 +48,7 @@ Echtzeit-Unschärfe (`RenderEffect`) gibt es erst ab Android 12; Fire OS 8 ist A
 
 - Dunkle Titelleiste (DWM), Karten statt loser Felder: **Fernseher**, **Home-Taste** (Umschalter C3/Amazon), **C3 Desktop · PCs**, **Dieser PC · Sunshine**; Protokoll einklappbar.
 - Abgerundete, selbst gezeichnete Schaltflächen; Segoe UI Variable; gleiches Farbsystem wie der TV.
-- Kopf: Icon, „C3 Television OS“, „by Nico Lukowski“, Verbindungsstatus mit Version.
+- Kopf: Icon, „C3 Television OS“, „Updater“, Verbindungsstatus mit Version.
 
 ### Neu: „Sunshine installieren“ (Nutzerwunsch)
 
