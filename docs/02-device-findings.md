@@ -108,7 +108,8 @@ Status Smart Inputs: weiterhin **bedingt** (direktes Umschalten über Amazon nic
 | `android.settings.DISPLAY_SETTINGS` | `…DisplayAndSoundsActivity` (quicksettings + settings.v2) | ❌ kein Fehler, aber **nichts öffnet** |
 | `android.settings.SOUND_SETTINGS` | dito | ❌ kein Fehler, aber **nichts öffnet** |
 | `android.settings.DEVICE_INFO_SETTINGS` | `com.amazon.tv.settings.v2/.tv.device.DeviceActivity` | ✅ öffnet |
-| `android.settings.BLUETOOTH_SETTINGS` | **kein Ziel** | ❌ → eigene Activity von Amazon suchen |
+| `android.settings.BLUETOOTH_SETTINGS` | **kein Ziel** | ❌ |
+| Bluetooth-Seite (manuell geöffnet) | `com.amazon.tv.settings.v2/.tv.controllers_bluetooth_devices.ControllersAndBluetoothActivity` | 🟡 expliziter Start noch zu testen |
 | `android.settings.ACCESSIBILITY_SETTINGS` | Platzhalter | ❌ |
 | `com.amazon.tv.settings.action.HDMI_CONTROL_SETTINGS` | `inputpreference…HdmiControlSettingsActivity` | ❌ erfordert `com.amazon.tv.permission.LAUNCHER_SETTINGS` |
 
@@ -138,7 +139,7 @@ Zielwert C3 Home: Kaltstart **< 500 ms**.
 
 - Codec-Strategie: **HEVC** als Standard (am ausgereiftesten), **AV1** als Test – beide decodiert der TV in Hardware mit `low-latency`.
 - Laptop mit Hybridgrafik (iGPU + RTX): Sunshine-Capture hängt davon ab, welche GPU das Display treibt → ggf. MUX-Schalter/„dGPU only“ nötig. 🟡
-- Bester Pfad: Host per LAN; TV-Anbindung (WLAN/LAN) noch zu klären.
+- TV hängt im **WLAN**; Hosts haben 1080p-Monitore → Ziel **1080p60 HEVC**, ~15–20 Mbit/s. Leichte Latenz ist laut Nutzer akzeptabel. 4K nicht erforderlich.
 
 ## 8. Aktualisierte Go/No-Go-Bewertung
 
