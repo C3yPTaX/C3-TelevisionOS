@@ -159,13 +159,20 @@ Zielwert C3 Home: Kaltstart **< 500 ms**.
 - ✅ C3 Updater (Windows) aktualisiert den TV zuverlässig (Download `c3-latest` → `adb install -r` → Start).
 - ✅ PlayStation-Kachel öffnet die PS5 im Vollbild über `InputPlayerActivity` (TvView), mit Ton.
 
+## 7e. C3 Desktop – Direktstart (0.3.0-p2)
+
+- Moonlight 12.1 (Amazon Appstore) nutzt am TV `c2.mtk.hevc.decoder` mit `FEATURE_LowLatency`, 1080p60.
+- Direktstart über die exportierte Activity `com.limelight/.ShortcutTrampoline` mit Extras `UUID` + `AppId` (+ `AppName`) ✅ am Gerät bestätigt. Übergabe per PC-Name (`Name`/`AppName`-Lookup) gibt es erst in unveröffentlichten Moonlight-Versionen.
+- UUID = `<uniqueid>` aus Sunshine `http://localhost:47989/serverinfo`.
+- App-ID = `abs((int32) crc32(name + sha256hex(app-bild)))` (Sunshine `process.cpp`), gegen den echten Wert verifiziert. Der C3 Updater berechnet sie lokal aus `apps.json` und sendet die PC-Liste per `de.c3.tv.action.SET_PCS` an C3.
+
 ## 8. Aktualisierte Go/No-Go-Bewertung
 
 | Modul | vorher | jetzt |
 | --- | --- | --- |
 | C3 Home (App) | GO | **GO** – 3 von 6 Apps vorhanden, 3 müssen installiert werden |
 | C3 Home (HOME-Umleitung) | bedingt | **bedingt** – Aktivierung nur per ADB möglich |
-| C3 Desktop | GO 1080p60 | **GO**, 4K60 HEVC/AV1 hardwareseitig möglich, Low-Latency-Decoder vorhanden |
+| C3 Desktop | GO 1080p60 | **GO** – Direktstart in den Stream per Kachel; Konfiguration automatisch über den Updater |
 | C3 Smart Inputs | bedingt | **GO** – PS5/HDMI per `TvView`-Vollbildplayer in C3, im Alltag bestätigt; Latenz/Fernbedienung noch zu bewerten |
 | C3 Remote Power | GO | GO (unverändert, PC-Seite offen) |
 | C3 Control Center | teilweise | **reduziert** – Lautstärke, Einstellungen, Netzwerk, Geräteinfo, Systeminfo; Bild/Ton nur über Amazon-Schnelleinstellungen; Bluetooth offen |
