@@ -59,6 +59,8 @@ adb shell settings put secure accessibility_enabled 0
 
 Status der HOME-Umleitung bleibt 🟡, ist aber technisch weiter möglich.
 
+**Umsetzung (0.2.0-p1):** `de.c3.tv/de.c3.tv.redirect.HomeRedirectService` – nur `typeWindowStateChanged` von `com.amazon.tv.launcher`, kein Fensterinhalt. Umleitung, wenn eine Launcher-Activity mit `HomeActivity` im Namen erscheint; 2× HOME innerhalb von 2 s = Amazon-Home bleibt (60 s Ruhe). Ein-/Ausschalten über den C3 Updater (bewahrt andere Einträge in `enabled_accessibility_services`). Debug: `adb logcat -s C3HomeRedirect`.
+
 ## 5. Streaming-Apps
 
 | App | Paket / Start-Activity | Status |
