@@ -19,6 +19,7 @@ namespace C3
         const string VersionUrl = "https://github.com/C3yPTaX/C3-TelevisionOS/releases/download/c3-latest/c3-version.txt";
         const string PackageName = "de.c3.tv";
         const string MainActivity = "de.c3.tv/.MainActivity";
+        const string RedirectService = "de.c3.tv/de.c3.tv.redirect.HomeRedirectService";
 
         static readonly Color Bg = Color.FromArgb(18, 20, 26);
         static readonly Color Panel = Color.FromArgb(38, 42, 51);
@@ -33,6 +34,8 @@ namespace C3
         readonly Button saveButton = new Button();
         readonly Button updateButton = new Button();
         readonly Button startButton = new Button();
+        readonly Button redirectOnButton = new Button();
+        readonly Button redirectOffButton = new Button();
         readonly Label statusLabel = new Label();
         readonly TextBox log = new TextBox();
 
@@ -57,7 +60,7 @@ namespace C3
 
             Text = "C3 Updater";
             try { Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch { }
-            ClientSize = new Size(560, 500);
+            ClientSize = new Size(560, 550);
             FormBorderStyle = FormBorderStyle.FixedSingle;
             MaximizeBox = false;
             StartPosition = FormStartPosition.CenterScreen;
@@ -102,19 +105,29 @@ namespace C3
             StyleButton(updateButton, "TV aktualisieren", true);
             updateButton.Location = new Point(20, 196);
             updateButton.Size = new Size(260, 38);
-            updateButton.Click += delegate { RunAsync(true); };
+            updateButton.Click += delegate { RunAsync(Job.Update); };
 
             StyleButton(startButton, "C3 starten", false);
             startButton.Location = new Point(290, 196);
             startButton.Size = new Size(250, 38);
-            startButton.Click += delegate { RunAsync(false); };
+            startButton.Click += delegate { RunAsync(Job.Start); };
 
-            statusLabel.Location = new Point(22, 246);
+            StyleButton(redirectOnButton, "Home-Taste → C3", false);
+            redirectOnButton.Location = new Point(20, 242);
+            redirectOnButton.Size = new Size(260, 34);
+            redirectOnButton.Click += delegate { RunAsync(Job.RedirectOn); };
+
+            StyleButton(redirectOffButton, "Home-Taste → Amazon", false);
+            redirectOffButton.Location = new Point(290, 242);
+            redirectOffButton.Size = new Size(250, 34);
+            redirectOffButton.Click += delegate { RunAsync(Job.RedirectOff); };
+
+            statusLabel.Location = new Point(22, 290);
             statusLabel.Size = new Size(520, 22);
             statusLabel.ForeColor = Muted;
             statusLabel.Text = "Bereit.";
 
-            log.Location = new Point(20, 272);
+            log.Location = new Point(20, 316);
             log.Size = new Size(520, 210);
             log.Multiline = true;
             log.ReadOnly = true;
@@ -124,7 +137,7 @@ namespace C3
             log.BorderStyle = BorderStyle.None;
             log.Font = new Font("Consolas", 9f);
 
-            Controls.AddRange(new Control[] { title, deviceLabel, deviceBox, removeButton, nameLabel, nameBox, ipLabel, ipBox, saveButton, updateButton, startButton, statusLabel, log });
+            Controls.AddRange(new Control[] { title, deviceLabel, deviceBox, removeButton, nameLabel, nameBox, ipLabel, ipBox, saveButton, updateButton, startButton, redirectOnButton, redirectOffButton, statusLabel, log });
             AcceptButton = updateButton;
             LoadDevices();
         }
@@ -244,7 +257,9 @@ namespace C3
 
         // ------------------------------------------------------------------ workflow
 
-        void RunAsync(bool update)
+        enum Job { Update, Start, RedirectOn, RedirectOff }
+
+        void RunAsync(Job job)
         {
             string ip = ipBox.Text.Trim();
             if (ip.Length == 0)
@@ -260,7 +275,13 @@ namespace C3
             {
                 try
                 {
-                    if (update) DoUpdate(ip); else DoStart(ip);
+                    switch (job)
+                    {
+                        case Job.Update: DoUpdate(ip); break;
+                        case Job.Start: DoStart(ip); break;
+                        case Job.RedirectOn: DoRedirect(ip, true); break;
+                        case Job.RedirectOff: DoRedirect(ip, false); break;
+                    }
                 }
                 catch (Exception e)
                 {
@@ -313,6 +334,57 @@ namespace C3
             if (serial == null) return;
             Log(Adb("-s " + serial + " shell am start -n " + MainActivity, 20000).Trim());
             Status("C3 gestartet.");
+        }
+
+        /// Adds/removes the C3 HOME redirect in the enabled accessibility services, keeping
+        /// any other services that may be enabled. Fully reversible.
+        void DoRedirect(string ip, bool enable)
+        {
+            string serial = Connect(ip);
+            if (serial == null) return;
+
+            if (enable && InstalledVersion(serial) == null)
+            {
+                Log("C3 ist nicht installiert – zuerst \"TV aktualisieren\".");
+                Status("C3 fehlt.");
+                return;
+            }
+
+            string current = Adb("-s " + serial + " shell settings get secure enabled_accessibility_services", 15000).Trim();
+            if (current == "null") current = "";
+            Log("Vorher: " + (current.Length == 0 ? "(keine)" : current));
+
+            var services = new List<string>();
+            foreach (string s in current.Split(':'))
+            {
+                string t = s.Trim();
+                if (t.Length > 0 && !string.Equals(t, RedirectService, StringComparison.OrdinalIgnoreCase)) services.Add(t);
+            }
+            if (enable) services.Add(RedirectService);
+
+            if (services.Count == 0)
+            {
+                Adb("-s " + serial + " shell settings delete secure enabled_accessibility_services", 15000);
+                Adb("-s " + serial + " shell settings put secure accessibility_enabled 0", 15000);
+            }
+            else
+            {
+                string value = string.Join(":", services.ToArray());
+                Adb("-s " + serial + " shell settings put secure enabled_accessibility_services " + value, 15000);
+                Adb("-s " + serial + " shell settings put secure accessibility_enabled 1", 15000);
+            }
+
+            string after = Adb("-s " + serial + " shell settings get secure enabled_accessibility_services", 15000).Trim();
+            Log("Nachher: " + after);
+            if (enable)
+            {
+                Adb("-s " + serial + " shell am start -n " + MainActivity, 20000);
+                Status("Home-Taste öffnet jetzt C3. (2× Home = Amazon)");
+            }
+            else
+            {
+                Status("Home-Taste öffnet wieder Amazon.");
+            }
         }
 
         /// Returns the adb serial ("ip:5555") or null if the TV is not reachable/authorized.
@@ -446,6 +518,8 @@ namespace C3
         {
             updateButton.Enabled = !busy;
             startButton.Enabled = !busy;
+            redirectOnButton.Enabled = !busy;
+            redirectOffButton.Enabled = !busy;
             ipBox.Enabled = !busy;
             nameBox.Enabled = !busy;
             deviceBox.Enabled = !busy;

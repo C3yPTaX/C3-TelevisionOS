@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">C3</string>
+    <string name="redirect_label">C3 Home-Taste</string>
+    <string name="redirect_description">Öffnet C3 Home, wenn die Home-Taste gedrückt wird. Liest keine Bildschirminhalte.</string>
 </resources>

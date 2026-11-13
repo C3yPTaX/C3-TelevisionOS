@@ -17,6 +17,7 @@ import android.widget.TextView
 import de.c3.tv.R
 import de.c3.tv.core.TvInputs
 import de.c3.tv.core.dp
+import de.c3.tv.redirect.HomeRedirectService
 
 /**
  * Hidden diagnostics screen (MENU key on C3 Home). Answers the open Phase 1 questions
@@ -95,6 +96,7 @@ class DiagnosticsActivity : Activity() {
         sb.appendLine("Gerät: ${Build.MODEL} · Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})")
         sb.appendLine("RAM frei: ${mem.availMem / MB} MB von ${mem.totalMem / MB} MB · lowMemory=${mem.lowMemory}")
         sb.appendLine("C3 Speicher (PSS): ${own.totalPss / 1024} MB")
+        sb.appendLine("Home-Umleitung: " + if (HomeRedirectService.isEnabled(this)) "aktiv" else "aus")
         sb.appendLine()
         sb.appendLine("Sichtbare TV-Inputs: ${inputs.size}")
         inputs.forEach {
