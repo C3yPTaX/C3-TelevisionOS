@@ -1,0 +1,120 @@
+# C3-TelevisionOS – Messergebnisse vom Gerät (Phase 1)
+
+> Quelle: Ausgabe der lesenden ADB-Abfragen vom 2026-11-13 (Fire OS 8.1.8.5).
+> Persönliche Angaben (Gerätename, Netzwerk) sind hier bewusst nicht übernommen.
+
+## 1. System
+
+| Merkmal | Messwert | Bewertung |
+| --- | --- | --- |
+| API-Level / Android | **30 / 11** | ✅ bestätigt → `minSdk 30` |
+| Fire OS | 8.1.8.5, Build `RS8185.3885N` | ✅ |
+| Modell / Codename | `AFTBR92D74` / `ginzaeu` | ✅ |
+| SoC | `ro.hardware=mt5896` (Platform `merak`), 4× Cortex-A55 (`0xd05`), `/proc/cpuinfo` meldet *CPU architecture: 7* → **vermutlich 32-Bit-Kernel/Userspace** | 🟡 per `getprop ro.product.cpu.abilist` bestätigen; relevant nur für nativen Code (nicht geplant) |
+| RAM gesamt | 1 822 912 kB (~1,74 GiB nutzbar) | ✅ |
+| RAM verfügbar (Leerlauf, Amazon-Home) | **~440–500 MB** (`MemAvailable` 504 MB) | ⚠️ knapp |
+| Größter Verbraucher | `com.amazon.tv.launcher` **~129 MB PSS** | Referenzwert für C3 Home |
+| Heap pro App | `heapgrowthlimit=192m`, `heapsize=384m` | ✅ |
+| Speicher frei | 21 GB von 23 GB | ✅ |
+| `low_ram` | nicht gesetzt | ✅ |
+
+## 2. Anzeige
+
+| Merkmal | Messwert | Konsequenz |
+| --- | --- | --- |
+| Panel | 3840×2160 @ **60 Hz** (einziger Modus) | Animationen auf 60 fps |
+| UI-Auflösung | **Override 1920×1080, Dichte 320** → 960×540 dp | Layout für 960×540 dp entwerfen; Bilder in 1080p, nie 4K |
+| HDR | HDR10, HLG, HDR10+ (Typen 2/3/4) | Dolby Vision nur als Decoder-Profil gelistet, nicht als Display-HDR-Typ |
+| ALLM / Game-Content-Type für interne Apps | **nicht unterstützt** | Für Moonlight manuell Bildmodus „Spiel“ prüfen |
+
+## 3. Videodecoder (für Moonlight)
+
+| Codec | Hardware-Decoder | 4K60 | `low-latency`-Feature |
+| --- | --- | --- | --- |
+| H.264 | `c2.mtk.avc.decoder` | ja (lt. performance-point) | ✅ |
+| HEVC | `c2.mtk.hevc.decoder` | ✅ (gemessen 122 fps @ 4K, 295 fps @ 1080p) | ✅ |
+| AV1 | `c2.mtk.av1.decoder` | ✅ | ✅ |
+| VP9 | `c2.mtk.vp9.decoder` | ✅ | ✅ |
+
+**Bewertung:** Deutlich besser als erwartet. Die MediaTek-Decoder melden das Android-Feature `low-latency`, das Moonlight automatisch nutzt. Risiko R3 (Decoder-Latenz) sinkt von *mittel* auf *niedrig–mittel*; endgültig nur per Moonlight-Statistik messbar.
+
+## 4. Launcher / HOME
+
+| Befund | Wert |
+| --- | --- |
+| Standard-HOME | `com.amazon.tv.launcher/.ui.HomeActivity_vNext` (Priorität 950) |
+| Weitere HOME-Kandidaten | `com.amazon.firehomestarter`, `com.amazon.servicemenu`, `com.amazon.tv.settings.v2/.system.FallbackHome` – **nicht anfassen** |
+| Barrierefreiheit | keine Dienste aktiv; `ACTION_ACCESSIBILITY_SETTINGS` zeigt auf `CTSDummyIntentHandler` |
+
+**Konsequenz:** Amazon hat die Barrierefreiheits-Einstellungsseite auf diesem Gerät durch einen Platzhalter ersetzt. Ein Umleitungsdienst ließe sich **nicht über die TV-Oberfläche** aktivieren, sondern nur per ADB (reversibel):
+
+```
+# Aktivieren (nur wenn wir P1 umsetzen)
+adb shell settings put secure enabled_accessibility_services de.c3.tv/de.c3.tv.redirect.HomeRedirectService
+adb shell settings put secure accessibility_enabled 1
+# Rückweg (aktueller Wert ist "null" → wieder leeren)
+adb shell settings delete secure enabled_accessibility_services
+adb shell settings put secure accessibility_enabled 0
+```
+
+Status der HOME-Umleitung bleibt 🟡, ist aber technisch weiter möglich.
+
+## 5. Streaming-Apps
+
+| App | Paket / Start-Activity | Status |
+| --- | --- | --- |
+| Netflix | `com.netflix.ninja/.MainActivity` | ✅ installiert |
+| Prime Video | `com.amazon.firebat/com.amazon.pyrocore.IgnitionActivity` | ✅ vorinstalliert |
+| RTL+ | `de.cbc.tvnow.firetv/com.bedrockstreaming.shared.tv.activity.SplashActivity` | ✅ installiert |
+| YouTube | – | ❌ **nicht installiert** |
+| Twitch | – | ❌ **nicht installiert** |
+| Disney+ | – | ❌ **nicht installiert** |
+
+Fehlende Apps installierst du aus dem Amazon Appstore; danach Paketnamen per `pm list packages` nachtragen.
+
+## 6. HDMI-Eingänge & PlayStation
+
+| Port | Input-ID (TIF) | Eigenschaften | Gerät |
+| --- | --- | --- | --- |
+| HDMI 1 | `com.mediatek.tis/.HdmiInputService/HW2` | CEC | – |
+| HDMI 2 | `com.mediatek.tis/.HdmiInputService/HW3` | CEC, **ARC** | **PlayStation 5** |
+| HDMI 3 | `com.mediatek.tis/.HdmiInputService/HW4` | CEC | – |
+| PS5 (CEC-Gerät) | `com.mediatek.tis/.HdmiInputService/HDMI20000B` | logische Adresse 0x0B, physisch 0x2000, Name „PlayStation 5“ | ✅ erkannt |
+
+- HDMI-CEC ist am TV **aktiv** (`mHdmiControlEnabled: true`, Auto-Wakeup an).
+- Der TV fragt den Ein/Aus-Status der PS5 regelmäßig per CEC ab (`Give Device Power Status`) – PS5-Status ist damit systemseitig bekannt.
+- **Passthrough-Intent wird angenommen:** `content://android.media.tv/passthrough/...` löst auf `com.amazon.tv.livetv/.TvChannelsPlayerActivityAlias` auf. Direktes Umschalten aus C3 ist damit **sehr wahrscheinlich** möglich (Praxistest ausstehend).
+- PlayStation-Kachel: Erkennung über den CEC-Input `HDMI20000B` bzw. dessen Label „PlayStation 5“ via `TvInputManager` (Sichtbarkeit für Drittapps noch zu prüfen).
+
+Status Smart Inputs: von **bedingt** → **GO (vorbehaltlich Praxistest)**.
+
+## 7. Einstellungs-Deep-Links
+
+| Intent | Ziel | Nutzen für Control Center |
+| --- | --- | --- |
+| `android.settings.SETTINGS` | `com.amazon.tv.launcher/.ui.SettingsActivity` | Haupteinstellungen ✅ |
+| `android.settings.WIFI_SETTINGS` | `com.amazon.tv.settings.v2/.tv.network.NetworkActivity` | Netzwerk ✅ |
+| `android.settings.DISPLAY_SETTINGS` / `SOUND_SETTINGS` | `…DisplayAndSoundsActivity` (quicksettings + settings.v2) | Bild & Ton 🟡 (welches Ziel öffnet, testen) |
+| `android.settings.DEVICE_INFO_SETTINGS` | `com.amazon.tv.settings.v2/.tv.device.DeviceActivity` | Systeminfo / Neustart ✅ |
+| `android.settings.BLUETOOTH_SETTINGS` | **kein Ziel** | ❌ → eigene Activity von Amazon suchen |
+| `android.settings.ACCESSIBILITY_SETTINGS` | Platzhalter | ❌ |
+
+## 8. Aktualisierte Go/No-Go-Bewertung
+
+| Modul | vorher | jetzt |
+| --- | --- | --- |
+| C3 Home (App) | GO | **GO** – 3 von 6 Apps vorhanden, 3 müssen installiert werden |
+| C3 Home (HOME-Umleitung) | bedingt | **bedingt** – Aktivierung nur per ADB möglich |
+| C3 Desktop | GO 1080p60 | **GO**, 4K60 HEVC/AV1 hardwareseitig möglich, Low-Latency-Decoder vorhanden |
+| C3 Smart Inputs | bedingt | **GO (Praxistest ausstehend)** – Passthrough-Handler vorhanden, PS5 per CEC erkannt |
+| C3 Remote Power | GO | GO (unverändert, PC-Seite offen) |
+| C3 Control Center | teilweise | teilweise – WLAN/Bild/Ton/Info als Deep-Link; Bluetooth offen |
+
+## 9. Offene Praxistests
+
+Siehe Chatverlauf bzw. Abschnitt 8.3 in `01-feasibility-and-architecture.md`:
+
+1. HDMI-Umschaltung per Passthrough-Intent (HW3 und HDMI20000B)
+2. Start der drei vorhandenen Apps inkl. Kaltstartzeit
+3. Welche Activity öffnet für Bild-, Ton- und Bluetooth-Einstellungen
+4. Moonlight-Installation und Latenzmessung
