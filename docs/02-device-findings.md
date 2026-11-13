@@ -101,17 +101,28 @@ Status Smart Inputs: weiterhin **bedingt** (direktes Umschalten über Amazon nic
 
 ## 7. Einstellungs-Deep-Links
 
-| Intent | Ziel | Nutzen für Control Center |
+| Intent | Ziel | Praxistest `am start` |
 | --- | --- | --- |
-| `android.settings.SETTINGS` | `com.amazon.tv.launcher/.ui.SettingsActivity` | Haupteinstellungen ✅ |
-| `android.settings.WIFI_SETTINGS` | `com.amazon.tv.settings.v2/.tv.network.NetworkActivity` | Netzwerk ✅ |
-| `android.settings.DISPLAY_SETTINGS` / `SOUND_SETTINGS` | `…DisplayAndSoundsActivity` (quicksettings + settings.v2) | Bild & Ton 🟡 (welches Ziel öffnet, testen) |
-| `android.settings.DEVICE_INFO_SETTINGS` | `com.amazon.tv.settings.v2/.tv.device.DeviceActivity` | Systeminfo / Neustart ✅ |
+| `android.settings.SETTINGS` | `com.amazon.tv.launcher/.ui.SettingsActivity` | ✅ öffnet |
+| `android.settings.WIFI_SETTINGS` | `com.amazon.tv.settings.v2/.tv.network.NetworkActivity` | ✅ öffnet |
+| `android.settings.DISPLAY_SETTINGS` | `…DisplayAndSoundsActivity` (quicksettings + settings.v2) | ❌ kein Fehler, aber **nichts öffnet** |
+| `android.settings.SOUND_SETTINGS` | dito | ❌ kein Fehler, aber **nichts öffnet** |
+| `android.settings.DEVICE_INFO_SETTINGS` | `com.amazon.tv.settings.v2/.tv.device.DeviceActivity` | ✅ öffnet |
 | `android.settings.BLUETOOTH_SETTINGS` | **kein Ziel** | ❌ → eigene Activity von Amazon suchen |
 | `android.settings.ACCESSIBILITY_SETTINGS` | Platzhalter | ❌ |
 | `com.amazon.tv.settings.action.HDMI_CONTROL_SETTINGS` | `inputpreference…HdmiControlSettingsActivity` | ❌ erfordert `com.amazon.tv.permission.LAUNCHER_SETTINGS` |
 
 > Hinweis: Eine Auflösung per `query-activities` beweist nicht, dass der Start erlaubt ist. Jeder Deep-Link muss per `am start` geprüft werden.
+
+## 7a. Baseline: Kaltstartzeiten (`am start -S -W`)
+
+| App | TotalTime | WaitTime |
+| --- | --- | --- |
+| Netflix | 1111 ms | 1123 ms |
+| Prime Video | 2141 ms | 2158 ms |
+| RTL+ | 3016 ms | 3061 ms |
+
+Zielwert C3 Home: Kaltstart **< 500 ms**.
 
 ## 8. Aktualisierte Go/No-Go-Bewertung
 
@@ -129,6 +140,6 @@ Status Smart Inputs: weiterhin **bedingt** (direktes Umschalten über Amazon nic
 Siehe Chatverlauf bzw. Abschnitt 8.3 in `01-feasibility-and-architecture.md`:
 
 1. ~~HDMI-Umschaltung~~ → erledigt: über Amazon nicht möglich; `TvView`-Experiment folgt mit Test-APK
-2. Start der drei vorhandenen Apps inkl. Kaltstartzeit
+2. ~~Kaltstartzeiten~~ → erledigt (Abschnitt 7a)
 3. Welche Activity öffnet für Bild-, Ton- und Bluetooth-Einstellungen
 4. Moonlight-Installation und Latenzmessung
