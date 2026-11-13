@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="c3_bg">#FF0D0E12</color>
+    <color name="c3_bg_top">#FF1B1E26</color>
+    <color name="c3_tile">#FF262A33</color>
+    <color name="c3_tile_focused">#FF3A3F4B</color>
+    <color name="c3_stroke_focused">#CCFFFFFF</color>
+    <color name="c3_text">#FFEDEFF4</color>
+    <color name="c3_text_secondary">#FF8C92A0</color>
+    <color name="c3_accent">#FF5AA9FF</color>
+</resources>
