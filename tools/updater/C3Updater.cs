@@ -3,6 +3,7 @@
 // csc.exe kompiliert, braucht keine Laufzeit-Installation und keine Abhängigkeiten.
 
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
@@ -25,23 +26,38 @@ namespace C3
         static readonly Color Muted = Color.FromArgb(140, 146, 160);
         static readonly Color Accent = Color.FromArgb(90, 169, 255);
 
+        readonly ComboBox deviceBox = new ComboBox();
+        readonly Button removeButton = new Button();
+        readonly TextBox nameBox = new TextBox();
         readonly TextBox ipBox = new TextBox();
-        readonly Label statusLabel = new Label();
-        readonly TextBox log = new TextBox();
+        readonly Button saveButton = new Button();
         readonly Button updateButton = new Button();
         readonly Button startButton = new Button();
+        readonly Label statusLabel = new Label();
+        readonly TextBox log = new TextBox();
+
+        readonly List<Device> devices = new List<Device>();
         readonly string configPath;
+        readonly string devicesPath;
         string adbPath;
+
+        class Device
+        {
+            public string Name;
+            public string Ip;
+            public override string ToString() { return Name + "  (" + Ip + ")"; }
+        }
 
         public UpdaterForm()
         {
             string dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "C3Updater");
             Directory.CreateDirectory(dir);
             configPath = Path.Combine(dir, "tv-ip.txt");
+            devicesPath = Path.Combine(dir, "devices.txt");
 
             Text = "C3 Updater";
             try { Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch { }
-            ClientSize = new Size(560, 420);
+            ClientSize = new Size(560, 500);
             FormBorderStyle = FormBorderStyle.FixedSingle;
             MaximizeBox = false;
             StartPosition = FormStartPosition.CenterScreen;
@@ -50,32 +66,56 @@ namespace C3
             Font = new Font("Segoe UI", 10f);
 
             var title = new Label { Text = "C3 TelevisionOS", Font = new Font("Segoe UI Semibold", 16f), ForeColor = Fg, AutoSize = true, Location = new Point(20, 16) };
-            var ipLabel = new Label { Text = "TV-IP-Adresse", ForeColor = Muted, AutoSize = true, Location = new Point(22, 64) };
 
-            ipBox.Location = new Point(20, 86);
-            ipBox.Size = new Size(220, 28);
-            ipBox.BackColor = Panel;
-            ipBox.ForeColor = Fg;
-            ipBox.BorderStyle = BorderStyle.FixedSingle;
-            ipBox.Text = LoadIp();
+            // --- saved devices
+            var deviceLabel = new Label { Text = "Gespeichertes Gerät", ForeColor = Muted, AutoSize = true, Location = new Point(22, 62) };
+            deviceBox.Location = new Point(20, 84);
+            deviceBox.Size = new Size(380, 28);
+            deviceBox.DropDownStyle = ComboBoxStyle.DropDownList;
+            deviceBox.FlatStyle = FlatStyle.Flat;
+            deviceBox.BackColor = Panel;
+            deviceBox.ForeColor = Fg;
+            deviceBox.SelectedIndexChanged += delegate { OnDeviceSelected(); };
 
+            StyleButton(removeButton, "Entfernen", false);
+            removeButton.Location = new Point(410, 82);
+            removeButton.Size = new Size(130, 32);
+            removeButton.Click += delegate { RemoveDevice(); };
+
+            // --- name + ip
+            var nameLabel = new Label { Text = "TV-Name", ForeColor = Muted, AutoSize = true, Location = new Point(22, 126) };
+            nameBox.Location = new Point(20, 148);
+            nameBox.Size = new Size(200, 28);
+            StyleTextBox(nameBox);
+
+            var ipLabel = new Label { Text = "IP-Adresse", ForeColor = Muted, AutoSize = true, Location = new Point(232, 126) };
+            ipBox.Location = new Point(230, 148);
+            ipBox.Size = new Size(170, 28);
+            StyleTextBox(ipBox);
+
+            StyleButton(saveButton, "Gerät speichern", false);
+            saveButton.Location = new Point(410, 145);
+            saveButton.Size = new Size(130, 32);
+            saveButton.Click += delegate { SaveDevice(); };
+
+            // --- actions
             StyleButton(updateButton, "TV aktualisieren", true);
-            updateButton.Location = new Point(256, 82);
-            updateButton.Size = new Size(160, 34);
+            updateButton.Location = new Point(20, 196);
+            updateButton.Size = new Size(260, 38);
             updateButton.Click += delegate { RunAsync(true); };
 
             StyleButton(startButton, "C3 starten", false);
-            startButton.Location = new Point(424, 82);
-            startButton.Size = new Size(116, 34);
+            startButton.Location = new Point(290, 196);
+            startButton.Size = new Size(250, 38);
             startButton.Click += delegate { RunAsync(false); };
 
-            statusLabel.Location = new Point(22, 128);
+            statusLabel.Location = new Point(22, 246);
             statusLabel.Size = new Size(520, 22);
             statusLabel.ForeColor = Muted;
             statusLabel.Text = "Bereit.";
 
-            log.Location = new Point(20, 156);
-            log.Size = new Size(520, 244);
+            log.Location = new Point(20, 272);
+            log.Size = new Size(520, 210);
             log.Multiline = true;
             log.ReadOnly = true;
             log.ScrollBars = ScrollBars.Vertical;
@@ -84,8 +124,9 @@ namespace C3
             log.BorderStyle = BorderStyle.None;
             log.Font = new Font("Consolas", 9f);
 
-            Controls.AddRange(new Control[] { title, ipLabel, ipBox, updateButton, startButton, statusLabel, log });
+            Controls.AddRange(new Control[] { title, deviceLabel, deviceBox, removeButton, nameLabel, nameBox, ipLabel, ipBox, saveButton, updateButton, startButton, statusLabel, log });
             AcceptButton = updateButton;
+            LoadDevices();
         }
 
         void StyleButton(Button b, string text, bool primary)
@@ -98,6 +139,109 @@ namespace C3
             b.Cursor = Cursors.Hand;
         }
 
+        static void StyleTextBox(TextBox t)
+        {
+            t.BackColor = Panel;
+            t.ForeColor = Fg;
+            t.BorderStyle = BorderStyle.FixedSingle;
+        }
+
+        // ------------------------------------------------------------------ devices
+
+        void LoadDevices()
+        {
+            devices.Clear();
+            try
+            {
+                if (File.Exists(devicesPath))
+                {
+                    foreach (string line in File.ReadAllLines(devicesPath))
+                    {
+                        int sep = line.IndexOf('|');
+                        if (sep <= 0) continue;
+                        devices.Add(new Device { Name = line.Substring(0, sep), Ip = line.Substring(sep + 1).Trim() });
+                    }
+                }
+            }
+            catch { }
+
+            if (devices.Count > 0)
+            {
+                RefreshDeviceBox(devices[0]);
+            }
+            else
+            {
+                RefreshDeviceBox(null);
+                try { if (File.Exists(configPath)) ipBox.Text = File.ReadAllText(configPath).Trim(); } catch { }
+            }
+        }
+
+        void WriteDevices()
+        {
+            var lines = new List<string>();
+            foreach (Device d in devices) lines.Add(d.Name.Replace("|", "/") + "|" + d.Ip);
+            try { File.WriteAllLines(devicesPath, lines.ToArray()); } catch { }
+        }
+
+        void RefreshDeviceBox(Device select)
+        {
+            deviceBox.Items.Clear();
+            foreach (Device d in devices) deviceBox.Items.Add(d);
+            if (select != null) deviceBox.SelectedItem = select;
+            removeButton.Enabled = devices.Count > 0;
+        }
+
+        void OnDeviceSelected()
+        {
+            var d = deviceBox.SelectedItem as Device;
+            if (d == null) return;
+            nameBox.Text = d.Name;
+            ipBox.Text = d.Ip;
+        }
+
+        void SaveDevice()
+        {
+            string name = nameBox.Text.Trim();
+            string ip = ipBox.Text.Trim();
+            if (name.Length == 0 || ip.Length == 0)
+            {
+                MessageBox.Show(this, "Bitte TV-Name und IP-Adresse eintragen.", "C3 Updater");
+                return;
+            }
+            Device target = null;
+            foreach (Device d in devices)
+                if (string.Equals(d.Name, name, StringComparison.OrdinalIgnoreCase)) target = d;
+            if (target == null)
+            {
+                target = new Device { Name = name, Ip = ip };
+                devices.Add(target);
+            }
+            else
+            {
+                target.Name = name;
+                target.Ip = ip;
+            }
+            WriteDevices();
+            RefreshDeviceBox(target);
+            Status("Gerät \"" + name + "\" gespeichert.");
+        }
+
+        void RemoveDevice()
+        {
+            var d = deviceBox.SelectedItem as Device;
+            if (d == null) return;
+            if (MessageBox.Show(this, "\"" + d.Name + "\" entfernen?", "C3 Updater", MessageBoxButtons.YesNo) != DialogResult.Yes) return;
+            devices.Remove(d);
+            WriteDevices();
+            RefreshDeviceBox(devices.Count > 0 ? devices[0] : null);
+            if (devices.Count == 0)
+            {
+                nameBox.Text = "";
+                ipBox.Text = "";
+            }
+            Status("Gerät entfernt.");
+        }
+
         // ------------------------------------------------------------------ workflow
 
         void RunAsync(bool update)
@@ -108,7 +252,7 @@ namespace C3
                 MessageBox.Show(this, "Bitte die IP-Adresse des Fernsehers eintragen.", "C3 Updater");
                 return;
             }
-            SaveIp(ip);
+            RememberIp(ip);
             SetBusy(true);
             log.Clear();
 
@@ -292,12 +436,8 @@ namespace C3
             }
         }
 
-        string LoadIp()
-        {
-            try { return File.Exists(configPath) ? File.ReadAllText(configPath).Trim() : ""; } catch { return ""; }
-        }
-
-        void SaveIp(string ip)
+        /// Keeps the last used IP so an unsaved device is still prefilled next time.
+        void RememberIp(string ip)
         {
             try { File.WriteAllText(configPath, ip); } catch { }
         }
@@ -307,6 +447,10 @@ namespace C3
             updateButton.Enabled = !busy;
             startButton.Enabled = !busy;
             ipBox.Enabled = !busy;
+            nameBox.Enabled = !busy;
+            deviceBox.Enabled = !busy;
+            saveButton.Enabled = !busy;
+            removeButton.Enabled = !busy && devices.Count > 0;
             Cursor = busy ? Cursors.WaitCursor : Cursors.Default;
         }
 
