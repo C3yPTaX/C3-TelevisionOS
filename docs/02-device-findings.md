@@ -94,10 +94,13 @@ Fehlende Apps installierst du aus dem Amazon Appstore; danach Paketnamen per `pm
   **Ergebnis:** `PassthroughPlayerActivity` ist durch `com.amazon.tv.permission.TUNE_INPUT` geschützt, `protectionLevel: signature|amazon` (ebenso `com.amazon.tv.livetv.permission.TUNE_INPUT`). Selbst ADB (uid 2000) erhält `SecurityException`. → **Direktes Umschalten über Amazons Player ist für Drittapps nicht möglich.** ❌
   Vorgelagerter Einstieg `StartAmazonInputActivity` erfordert `com.amazon.tv.inputpreference.permission.LAUNCH_INPUTS` (`signature|privileged`). ❌
   **Fazit: Alle Amazon-Wege zum direkten Eingangswechsel sind für Drittapps gesperrt.** Kein Umgehen ohne Root/Firmware → außerhalb unserer Regeln.
+- **✅ Durchbruch (P0-Diagnose, 2026-11-13): `TvView` funktioniert für Drittapps.** C3 sieht 15 TV-Inputs (inkl. CEC-Gerät „PlayStation 5“, `HDMI20000B`, parent `HW3`) und zeigt das **Live-Bild der PS5 in der eigenen Oberfläche** an (`TvView.tune(inputId, buildChannelUriForPassthroughInput(inputId))`). Ohne Sonderrechte.
+  - Offen: Ton, Eingabeverzögerung (Bildmodus/Game-Mode), Weiterleitung der Fernbedienung per CEC, Verhalten bei Vollbild.
+  - Der gemeldete Input-Status („Standby“) stimmte nicht mit dem tatsächlichen Zustand (PS5 an) überein → für Statusanzeige nicht verlässlich.
 - **Ausweichwege für die PlayStation-Kachel:** (1) CEC One Touch Play (PS5 schaltet TV selbst um) ✅, (2) Amazons Eingangsauswahl öffnen 🟡, (3) HDMI-Bild per `TvView` in C3 selbst darstellen – plausibel, ungetestet, nur als Experiment 🟡.
 - PlayStation-Kachel: Erkennung über den CEC-Input `HDMI20000B` bzw. dessen Label „PlayStation 5“ via `TvInputManager` (Sichtbarkeit für Drittapps noch zu prüfen).
 
-Status Smart Inputs: weiterhin **bedingt** (direktes Umschalten über Amazon nicht erlaubt).
+Status Smart Inputs: **GO über eigenen `TvView`-Vollbildplayer** (Ton/Latenz noch zu prüfen); Amazons Umschaltwege bleiben gesperrt.
 
 ## 7. Einstellungs-Deep-Links
 
@@ -141,6 +144,14 @@ Zielwert C3 Home: Kaltstart **< 500 ms**.
 - Laptop mit Hybridgrafik (iGPU + RTX): Sunshine-Capture hängt davon ab, welche GPU das Display treibt → ggf. MUX-Schalter/„dGPU only“ nötig. 🟡
 - TV hängt im **WLAN**; Hosts haben 1080p-Monitore → Ziel **1080p60 HEVC**, ~15–20 Mbit/s. Leichte Latenz ist laut Nutzer akzeptabel. 4K nicht erforderlich.
 
+## 7c. P0 – erste Messung
+
+| Wert | Messung | Ziel |
+| --- | --- | --- |
+| Kaltstart (erste Installation, nicht vorkompiliert) | 875 ms | < 500 ms |
+| `dumpsys meminfo` TOTAL PSS (Vordergrund) | 73 MB | ≤ 40 MB (Ziel wird nach Aufschlüsselung überprüft) |
+| `Debug.getMemoryInfo` PSS (Diagnose-Seite) | 31 MB | – |
+
 ## 8. Aktualisierte Go/No-Go-Bewertung
 
 | Modul | vorher | jetzt |
@@ -148,7 +159,7 @@ Zielwert C3 Home: Kaltstart **< 500 ms**.
 | C3 Home (App) | GO | **GO** – 3 von 6 Apps vorhanden, 3 müssen installiert werden |
 | C3 Home (HOME-Umleitung) | bedingt | **bedingt** – Aktivierung nur per ADB möglich |
 | C3 Desktop | GO 1080p60 | **GO**, 4K60 HEVC/AV1 hardwareseitig möglich, Low-Latency-Decoder vorhanden |
-| C3 Smart Inputs | bedingt | **bedingt** – PS5 per CEC erkannt; Amazons Umschalt-Player ist signaturgeschützt (`TUNE_INPUT`), Ausweichwege in Prüfung |
+| C3 Smart Inputs | bedingt | **GO (vorläufig)** – HDMI/PS5-Bild per `TvView` direkt in C3; Ton und Latenz noch prüfen |
 | C3 Remote Power | GO | GO (unverändert, PC-Seite offen) |
 | C3 Control Center | teilweise | **reduziert** – Lautstärke, Einstellungen, Netzwerk, Geräteinfo, Systeminfo; Bild/Ton nur über Amazon-Schnelleinstellungen; Bluetooth offen |
 
