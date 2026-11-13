@@ -91,10 +91,12 @@ Fehlende Apps installierst du aus dem Amazon Appstore; danach Paketnamen per `pm
   cmp=com.amazon.tv.inputpreference.service/com.amazon.tv.inputpreference.player.PassthroughPlayerActivity
   ```
   Vorgelagert: `act=com.amazon.tv.inputpreference.service.action.SWITCH_AMAZON_INPUT` → `.StartAmazonInputActivity`.
-  Offen: Aufruf per ADB und **Exportstatus/Berechtigungen** für Drittapps. 🟡
+  **Ergebnis:** `PassthroughPlayerActivity` ist durch `com.amazon.tv.permission.TUNE_INPUT` geschützt, `protectionLevel: signature|amazon` (ebenso `com.amazon.tv.livetv.permission.TUNE_INPUT`). Selbst ADB (uid 2000) erhält `SecurityException`. → **Direktes Umschalten über Amazons Player ist für Drittapps nicht möglich.** ❌
+  Noch zu prüfen: ob der vorgelagerte Einstieg `SWITCH_AMAZON_INPUT` / `StartAmazonInputActivity` ungeschützt ist. 🟡
+- **Ausweichwege für die PlayStation-Kachel:** (1) CEC One Touch Play (PS5 schaltet TV selbst um) ✅, (2) Amazons Eingangsauswahl öffnen 🟡, (3) HDMI-Bild per `TvView` in C3 selbst darstellen – plausibel, ungetestet, nur als Experiment 🟡.
 - PlayStation-Kachel: Erkennung über den CEC-Input `HDMI20000B` bzw. dessen Label „PlayStation 5“ via `TvInputManager` (Sichtbarkeit für Drittapps noch zu prüfen).
 
-Status Smart Inputs: von **bedingt** → **GO (vorbehaltlich Praxistest)**.
+Status Smart Inputs: weiterhin **bedingt** (direktes Umschalten über Amazon nicht erlaubt).
 
 ## 7. Einstellungs-Deep-Links
 
@@ -114,7 +116,7 @@ Status Smart Inputs: von **bedingt** → **GO (vorbehaltlich Praxistest)**.
 | C3 Home (App) | GO | **GO** – 3 von 6 Apps vorhanden, 3 müssen installiert werden |
 | C3 Home (HOME-Umleitung) | bedingt | **bedingt** – Aktivierung nur per ADB möglich |
 | C3 Desktop | GO 1080p60 | **GO**, 4K60 HEVC/AV1 hardwareseitig möglich, Low-Latency-Decoder vorhanden |
-| C3 Smart Inputs | bedingt | **GO (Praxistest ausstehend)** – Passthrough-Handler vorhanden, PS5 per CEC erkannt |
+| C3 Smart Inputs | bedingt | **bedingt** – PS5 per CEC erkannt; Amazons Umschalt-Player ist signaturgeschützt (`TUNE_INPUT`), Ausweichwege in Prüfung |
 | C3 Remote Power | GO | GO (unverändert, PC-Seite offen) |
 | C3 Control Center | teilweise | teilweise – WLAN/Bild/Ton/Info als Deep-Link; Bluetooth offen |
 
