@@ -152,6 +152,11 @@ Zielwert C3 Home: Kaltstart **< 500 ms**.
 | `dumpsys meminfo` TOTAL PSS (Vordergrund) | 73 MB | ≤ 40 MB (Ziel wird nach Aufschlüsselung überprüft) |
 | `Debug.getMemoryInfo` PSS (Diagnose-Seite) | 31 MB | – |
 
+## 7d. P0.1 – Praxistest (Nutzer, 2026-11-13)
+
+- ✅ C3 Updater (Windows) aktualisiert den TV zuverlässig (Download `c3-latest` → `adb install -r` → Start).
+- ✅ PlayStation-Kachel öffnet die PS5 im Vollbild über `InputPlayerActivity` (TvView), mit Ton.
+
 ## 8. Aktualisierte Go/No-Go-Bewertung
 
 | Modul | vorher | jetzt |
@@ -159,7 +164,7 @@ Zielwert C3 Home: Kaltstart **< 500 ms**.
 | C3 Home (App) | GO | **GO** – 3 von 6 Apps vorhanden, 3 müssen installiert werden |
 | C3 Home (HOME-Umleitung) | bedingt | **bedingt** – Aktivierung nur per ADB möglich |
 | C3 Desktop | GO 1080p60 | **GO**, 4K60 HEVC/AV1 hardwareseitig möglich, Low-Latency-Decoder vorhanden |
-| C3 Smart Inputs | bedingt | **GO (vorläufig)** – HDMI/PS5-Bild per `TvView` direkt in C3; Ton und Latenz noch prüfen |
+| C3 Smart Inputs | bedingt | **GO** – PS5/HDMI per `TvView`-Vollbildplayer in C3, im Alltag bestätigt; Latenz/Fernbedienung noch zu bewerten |
 | C3 Remote Power | GO | GO (unverändert, PC-Seite offen) |
 | C3 Control Center | teilweise | **reduziert** – Lautstärke, Einstellungen, Netzwerk, Geräteinfo, Systeminfo; Bild/Ton nur über Amazon-Schnelleinstellungen; Bluetooth offen |
 
