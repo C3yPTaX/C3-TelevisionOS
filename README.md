@@ -163,19 +163,26 @@ Add essential settings, benchmark against the Phase 1 baseline, test idle resour
 - Measured and acceptable startup, resource use and navigation responsiveness
 - Safe, documented return to the stock launcher and TV behavior
 
-## Prototype P0: install & test
+## Prototype: install & update
 
-1. Download the latest `c3-tv-apk` artifact from **Actions → Android build** (GitHub, signed in) and unzip it.
-2. Install / update (TV with ADB debugging enabled):
-   ```
-   adb connect <tv-ip>:5555
-   adb install -r c3-tv-<n>.apk
-   adb shell am start -n de.c3.tv/.MainActivity
-   ```
-3. On C3 Home press **☰ (Menu)** for the diagnostics screen.
-4. Remove completely: `adb uninstall de.c3.tv`
+**Easiest: C3 Updater (Windows)**
 
-The APK is signed with a **development key committed to the repo** (`app/dev.keystore`) so CI builds can be updated in place. It must be replaced by a private key before any public release.
+1. Download `C3-Updater.exe` once from the [`c3-latest` release](https://github.com/C3yPTaX/C3-TelevisionOS/releases/tag/c3-latest).
+2. Start it, enter the TV's IP address, click **TV aktualisieren**. It downloads the newest APK, installs it via ADB and starts C3.
+   Requirements: ADB debugging enabled on the TV, `adb` installed (`winget install Google.PlatformTools`).
+
+**Manual**
+
+```
+adb connect <tv-ip>:5555
+adb install -r c3-tv.apk
+adb shell am start -n de.c3.tv/.MainActivity
+```
+
+- On C3 Home press **☰ (Menu)** for the diagnostics screen.
+- Remove completely: `adb uninstall de.c3.tv`
+
+The APK is signed with a **development key committed to the repo** (`app/dev.keystore`) so CI builds can be updated in place. It must be replaced by a private key before any public release. The updater icon is taken from the author's C3-MetinVision project.
 
 ## Development workflow
 

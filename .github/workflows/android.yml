@@ -7,8 +7,11 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
-  build:
+  apk:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -24,11 +27,66 @@ jobs:
       - name: Build release APK (R8, dev-signed)
         run: ./gradlew --no-daemon assembleRelease
 
-      - name: Rename APK
-        run: cp app/build/outputs/apk/release/app-release.apk c3-tv-${{ github.run_number }}.apk
+      - name: Prepare files
+        run: |
+          mkdir out
+          cp app/build/outputs/apk/release/app-release.apk out/c3-tv.apk
+          version=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
+          echo "$version (Build #${{ github.run_number }}, ${GITHUB_SHA::7})" > out/c3-version.txt
+          cat out/c3-version.txt
 
       - uses: actions/upload-artifact@v4
         with:
           name: c3-tv-apk
-          path: c3-tv-*.apk
+          path: out/*
           if-no-files-found: error
+
+  updater:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build C3-Updater.exe (built-in .NET Framework compiler)
+        shell: pwsh
+        run: |
+          $csc = "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
+          New-Item -ItemType Directory -Force out | Out-Null
+          & $csc /nologo /target:winexe /optimize+ /out:out\C3-Updater.exe `
+            /win32icon:tools\updater\C3Updater.ico `
+            /reference:System.dll /reference:System.Drawing.dll /reference:System.Windows.Forms.dll `
+            tools\updater\C3Updater.cs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Get-Item out\C3-Updater.exe
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: c3-updater
+          path: out/C3-Updater.exe
+          if-no-files-found: error
+
+  publish:
+    # Public download location used by C3-Updater.exe (fixed tag, replaced on every push).
+    if: github.event_name != 'pull_request'
+    needs: [ apk, updater ]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Replace release "c3-latest"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          ls -la dist
+          gh release delete c3-latest --yes --cleanup-tag || true
+          gh release create c3-latest dist/c3-tv.apk dist/c3-version.txt dist/C3-Updater.exe \
+            --prerelease \
+            --target "$GITHUB_SHA" \
+            --title "C3 – neuester Build" \
+            --notes "Automatisch erzeugt aus ${GITHUB_REF_NAME} @ ${GITHUB_SHA::7}. $(cat dist/c3-version.txt). Installation: C3-Updater.exe starten, TV-IP eintragen, 'TV aktualisieren'."
