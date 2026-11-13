@@ -163,6 +163,20 @@ Add essential settings, benchmark against the Phase 1 baseline, test idle resour
 - Measured and acceptable startup, resource use and navigation responsiveness
 - Safe, documented return to the stock launcher and TV behavior
 
+## Prototype P0: install & test
+
+1. Download the latest `c3-tv-apk` artifact from **Actions → Android build** (GitHub, signed in) and unzip it.
+2. Install / update (TV with ADB debugging enabled):
+   ```
+   adb connect <tv-ip>:5555
+   adb install -r c3-tv-<n>.apk
+   adb shell am start -n de.c3.tv/.MainActivity
+   ```
+3. On C3 Home press **☰ (Menu)** for the diagnostics screen.
+4. Remove completely: `adb uninstall de.c3.tv`
+
+The APK is signed with a **development key committed to the repo** (`app/dev.keystore`) so CI builds can be updated in place. It must be replaced by a private key before any public release.
+
 ## Development workflow
 
 Development is incremental and requirement-driven. Implement one tested module at a time. Record any platform limitations explicitly; do not silently replace requirements with unsafe hacks. Use feature branches and pull requests, keep the default branch stable, and validate changes on-device before considering them complete.

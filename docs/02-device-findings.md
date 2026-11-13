@@ -109,7 +109,7 @@ Status Smart Inputs: weiterhin **bedingt** (direktes Umschalten über Amazon nic
 | `android.settings.SOUND_SETTINGS` | dito | ❌ kein Fehler, aber **nichts öffnet** |
 | `android.settings.DEVICE_INFO_SETTINGS` | `com.amazon.tv.settings.v2/.tv.device.DeviceActivity` | ✅ öffnet |
 | `android.settings.BLUETOOTH_SETTINGS` | **kein Ziel** | ❌ |
-| Bluetooth-Seite (manuell geöffnet) | `com.amazon.tv.settings.v2/.tv.controllers_bluetooth_devices.ControllersAndBluetoothActivity` | 🟡 expliziter Start noch zu testen |
+| Bluetooth-Seite (manuell geöffnet) | `com.amazon.tv.settings.v2/.tv.controllers_bluetooth_devices.ControllersAndBluetoothActivity` | ✅ per expliziter Komponente startbar (ADB-Test: kein Permission Denial) |
 | `android.settings.ACCESSIBILITY_SETTINGS` | Platzhalter | ❌ |
 | `com.amazon.tv.settings.action.HDMI_CONTROL_SETTINGS` | `inputpreference…HdmiControlSettingsActivity` | ❌ erfordert `com.amazon.tv.permission.LAUNCHER_SETTINGS` |
 
