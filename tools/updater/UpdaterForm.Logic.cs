@@ -18,8 +18,19 @@ namespace C3
 {
     public partial class UpdaterForm
     {
-        const string ApkUrl = "https://github.com/C3yPTaX/C3-TelevisionOS/releases/download/c3-latest/c3-tv.apk";
-        const string VersionUrl = "https://github.com/C3yPTaX/C3-TelevisionOS/releases/download/c3-latest/c3-version.txt";
+        // Stable = newest versioned release from main (vX.Y.Z); Dev = rolling pre-release "c3-latest".
+        const string StableBase = "https://github.com/C3yPTaX/C3-TelevisionOS/releases/latest/download/";
+        const string DevBase = "https://github.com/C3yPTaX/C3-TelevisionOS/releases/download/c3-latest/";
+
+        /// Version of this updater (from the release build), e.g. "0.4.0".
+        static string UpdaterVersion
+        {
+            get
+            {
+                var v = typeof(UpdaterForm).Assembly.GetName().Version;
+                return v.Major + "." + v.Minor + "." + v.Build;
+            }
+        }
         const string PackageName = "de.c3.tv";
         const string MainActivity = "de.c3.tv/.MainActivity";
         const string RedirectService = "de.c3.tv/de.c3.tv.redirect.HomeRedirectService";
@@ -27,6 +38,7 @@ namespace C3
         readonly List<Pc> pcs = new List<Pc>();
         readonly List<Device> devices = new List<Device>();
         Pc pcToRemove;
+        bool useDevChannel;
         string configPath;
         string devicesPath;
         string pcsPath;
@@ -208,11 +220,22 @@ namespace C3
             Log("Installiert auf dem TV: " + (installed ?? "–"));
 
             Status("Lade neueste Version von GitHub …");
-            string latest = Download(VersionUrl, null);
-            if (latest != null) Log("Neueste Version: " + latest.Trim());
-
             string apk = Path.Combine(Path.GetTempPath(), "c3-tv.apk");
-            Download(ApkUrl, apk);
+            string channelBase = useDevChannel ? DevBase : StableBase;
+            try
+            {
+                Download(channelBase + "c3-tv.apk", apk);
+            }
+            catch (WebException e)
+            {
+                if (useDevChannel) throw;
+                Log("Noch kein stabiles Release verfügbar (" + e.Message + ") – nutze die Entwicklerversion.");
+                channelBase = DevBase;
+                Download(channelBase + "c3-tv.apk", apk);
+            }
+            Log("Kanal: " + (channelBase == DevBase ? "Entwicklerversion (c3-latest)" : "Stabil (neuestes Release)"));
+            string latest = Download(channelBase + "c3-version.txt", null);
+            if (latest != null) Log("Version: " + latest.Trim());
             Log("APK geladen: " + new FileInfo(apk).Length / 1024 + " KB");
 
             Status("Installiere auf dem Fernseher …");
