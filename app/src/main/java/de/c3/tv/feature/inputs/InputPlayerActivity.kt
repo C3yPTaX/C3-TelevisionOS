@@ -28,12 +28,12 @@ import de.c3.tv.core.dp
 class InputPlayerActivity : Activity() {
 
     private lateinit var tvView: TvView
-    private lateinit var overlay: TextView
+    private lateinit var overlayText: TextView
     private val handler = Handler(Looper.getMainLooper())
-    private val hideOverlay = Runnable { overlay.visibility = View.GONE }
+    private val hideOverlay = Runnable { overlayText.visibility = View.GONE }
 
     private val inputId: String by lazy { intent.getStringExtra(EXTRA_INPUT_ID).orEmpty() }
-    private val title: String by lazy { intent.getStringExtra(EXTRA_TITLE) ?: "HDMI" }
+    private val inputTitle: String by lazy { intent.getStringExtra(EXTRA_TITLE) ?: "HDMI" }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -43,37 +43,37 @@ class InputPlayerActivity : Activity() {
             isFocusableInTouchMode = true
             setCallback(object : TvView.TvInputCallback() {
                 override fun onVideoAvailable(inputId: String) {
-                    showOverlay("$title  ·  Zurück-Taste: C3 Home", autoHide = true)
+                    showOverlay("$inputTitle  ·  Zurück-Taste: C3 Home", autoHide = true)
                 }
 
                 override fun onVideoUnavailable(inputId: String, reason: Int) {
-                    showOverlay("$title: kein Signal\nGerät einschalten (PS5: PS-Taste am Controller)", autoHide = false)
+                    showOverlay("$inputTitle: kein Signal\nGerät einschalten (PS5: PS-Taste am Controller)", autoHide = false)
                 }
 
                 override fun onConnectionFailed(inputId: String) {
-                    showOverlay("$title konnte nicht geöffnet werden", autoHide = false)
+                    showOverlay("$inputTitle konnte nicht geöffnet werden", autoHide = false)
                 }
 
                 override fun onDisconnected(inputId: String) {
-                    showOverlay("$title wurde getrennt", autoHide = false)
+                    showOverlay("$inputTitle wurde getrennt", autoHide = false)
                 }
             })
         }
 
-        overlay = TextView(this).apply {
+        overlayText = TextView(this).apply {
             setTextColor(getColor(R.color.c3_text))
             textSize = 16f
             gravity = Gravity.CENTER
             setBackgroundColor(0xB3000000.toInt())
             val p = dp(16)
             setPadding(p * 2, p, p * 2, p)
-            text = "$title wird geöffnet …"
+            text = "$inputTitle wird geöffnet …"
         }
 
         val root = FrameLayout(this).apply {
             setBackgroundColor(0xFF000000.toInt())
             addView(tvView, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
-            addView(overlay, FrameLayout.LayoutParams(
+            addView(overlayText, FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT,
                 Gravity.CENTER_HORIZONTAL or Gravity.BOTTOM,
@@ -92,7 +92,7 @@ class InputPlayerActivity : Activity() {
             tvView.tune(inputId, TvContract.buildChannelUriForPassthroughInput(inputId))
             tvView.requestFocus()
         } catch (e: Exception) {
-            showOverlay("$title konnte nicht geöffnet werden (${e.javaClass.simpleName})", autoHide = false)
+            showOverlay("$inputTitle konnte nicht geöffnet werden (${e.javaClass.simpleName})", autoHide = false)
         }
     }
 
@@ -116,8 +116,8 @@ class InputPlayerActivity : Activity() {
 
     private fun showOverlay(message: String, autoHide: Boolean) {
         handler.removeCallbacks(hideOverlay)
-        overlay.text = message
-        overlay.visibility = View.VISIBLE
+        overlayText.text = message
+        overlayText.visibility = View.VISIBLE
         if (autoHide) handler.postDelayed(hideOverlay, OVERLAY_MS)
     }
 
@@ -126,9 +126,9 @@ class InputPlayerActivity : Activity() {
         private const val EXTRA_TITLE = "de.c3.tv.extra.TITLE"
         private const val OVERLAY_MS = 2500L
 
-        fun intent(context: Context, inputId: String, title: String): Intent =
+        fun intent(context: Context, inputId: String, inputTitle: String): Intent =
             Intent(context, InputPlayerActivity::class.java)
                 .putExtra(EXTRA_INPUT_ID, inputId)
-                .putExtra(EXTRA_TITLE, title)
+                .putExtra(EXTRA_TITLE, inputTitle)
     }
 }
