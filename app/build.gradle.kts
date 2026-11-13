@@ -3,6 +3,12 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
+// Single source of truth for the version: /VERSION (x.y.z). versionCode = x*10000 + y*100 + z.
+val appVersion: String = rootProject.file("VERSION").readText().trim()
+val appVersionCode: Int = appVersion.split(".").let { (major, minor, patch) ->
+    major.toInt() * 10000 + minor.toInt() * 100 + patch.toInt()
+}
+
 android {
     namespace = "de.c3.tv"
     compileSdk = 35
@@ -11,8 +17,8 @@ android {
         applicationId = "de.c3.tv"
         minSdk = 30 // Fire OS 8 = Android 11
         targetSdk = 35
-        versionCode = 6
-        versionName = "0.4.0-design"
+        versionCode = appVersionCode
+        versionName = appVersion
     }
 
     signingConfigs {
