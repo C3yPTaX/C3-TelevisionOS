@@ -26,6 +26,14 @@ namespace C3
         readonly DarkCombo pcBox = new DarkCombo();
         readonly RoundButton addPcButton = new RoundButton();
         readonly RoundButton removePcButton = new RoundButton();
+        readonly Pill privatePill = new Pill();
+        readonly DarkCombo siteBox = new DarkCombo();
+        readonly RoundButton removeSiteButton = new RoundButton();
+        readonly Field siteNameField = new Field("Name");
+        readonly Field siteUrlField = new Field("Adresse");
+        readonly RoundButton addSiteButton = new RoundButton();
+        readonly RoundButton privateOnButton = new RoundButton();
+        readonly RoundButton privateOffButton = new RoundButton();
         readonly Pill sunshinePill = new Pill();
         readonly Label sysValues = new Label();
         readonly RoundButton sunshineButton = new RoundButton();
@@ -115,6 +123,30 @@ namespace C3
             addPcButton.Click += delegate { RunAsync(Job.AddPc); };
             y += 132 + 14;
 
+            // ---------------------------------------------------------------- Privat
+            var priv = NewCard(y, 176);
+            priv.Controls.Add(CardLabel("Privat", 16, 12));
+            privatePill.Height = 22;
+            privatePill.Location = new Point(CardW - 16 - 60, 12);
+            priv.Controls.Add(privatePill);
+            privatePill.Set("–", Theme.Muted, Theme.Field);
+            Place(priv, siteBox, 16, 40, 400, 30);
+            Setup(removeSiteButton, "Entfernen", false);
+            Place(priv, removeSiteButton, 424, 40, 132, 30);
+            removeSiteButton.Click += delegate { RemoveSite(); };
+            Place(priv, siteNameField, 16, 80, 180, 34);
+            Place(priv, siteUrlField, 204, 80, 212, 34);
+            Setup(addSiteButton, "Hinzufügen", false);
+            Place(priv, addSiteButton, 424, 80, 132, 34);
+            addSiteButton.Click += delegate { AddSite(); };
+            Setup(privateOnButton, "Privat an", false);
+            Place(priv, privateOnButton, 16, 126, 268, 36);
+            privateOnButton.Click += delegate { RunAsync(Job.PrivateOn); };
+            Setup(privateOffButton, "Privat aus + Silk-Verlauf löschen", false);
+            Place(priv, privateOffButton, 292, 126, 264, 36);
+            privateOffButton.Click += delegate { RunAsync(Job.PrivateOff); };
+            y += 176 + 14;
+
             // ---------------------------------------------------------------- Sunshine
             var sun = NewCard(y, 186);
             sun.Controls.Add(CardLabel("Dieser PC · Sunshine", 16, 12));
@@ -179,11 +211,13 @@ namespace C3
             log.Visible = false;
             Controls.Add(log);
 
-            ClientSize = new Size(W, collapsedHeight);
+            AutoScroll = true;
+            ApplyHeight(collapsedHeight);
             AcceptButton = updateButton;
 
             LoadDevices();
             LoadPcs();
+            LoadSites();
             DetectSystemAsync();
         }
 
@@ -248,11 +282,24 @@ namespace C3
             return System.IO.Path.Combine(System.IO.Path.GetDirectoryName(devicesPath), "channel-dev.txt");
         }
 
+        /// Fits the window on small or scaled screens; content scrolls if it is taller.
+        void ApplyHeight(int desired)
+        {
+            int max = Screen.FromPoint(Cursor.Position).WorkingArea.Height - 60;
+            if (desired <= max)
+            {
+                ClientSize = new Size(W, desired);
+                return;
+            }
+            ClientSize = new Size(W + SystemInformation.VerticalScrollBarWidth, max);
+            AutoScrollMinSize = new Size(W, desired);
+        }
+
         void ToggleDetails()
         {
             log.Visible = !log.Visible;
             detailsLink.Text = log.Visible ? "Details ausblenden" : "Details anzeigen";
-            ClientSize = new Size(W, log.Visible ? collapsedHeight + log.Height + 8 : collapsedHeight);
+            ApplyHeight(log.Visible ? collapsedHeight + log.Height + 8 : collapsedHeight);
         }
 
         // ------------------------------------------------------------------ state shown in the UI
@@ -276,9 +323,10 @@ namespace C3
 
         void SetBusy(bool busy)
         {
-            foreach (var b in new Control[] { updateButton, startButton, redirectOnButton, redirectOffButton, addPcButton, removePcButton, pcBox, ipField, nameField, deviceBox, saveButton })
+            foreach (var b in new Control[] { updateButton, startButton, redirectOnButton, redirectOffButton, addPcButton, removePcButton, pcBox, ipField, nameField, deviceBox, saveButton, privateOnButton, privateOffButton, addSiteButton, siteBox, siteNameField, siteUrlField })
                 b.Enabled = !busy;
             removeButton.Enabled = !busy && devices.Count > 0;
+            removeSiteButton.Enabled = !busy && sites.Count > 0;
             sunshineButton.Enabled = !busy && sunshineButtonReady;
             Cursor = busy ? Cursors.WaitCursor : Cursors.Default;
         }
