@@ -1,11 +1,15 @@
 package de.c3.tv.redirect
 
 import android.accessibilityservice.AccessibilityService
+import android.accessibilityservice.AccessibilityServiceInfo
 import android.content.Context
 import android.content.Intent
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
 import android.provider.Settings
 import android.util.Log
+import android.view.KeyEvent
 import android.view.accessibility.AccessibilityEvent
 import de.c3.tv.MainActivity
 import de.c3.tv.remote.LinkReceiver
@@ -21,6 +25,10 @@ import de.c3.tv.remote.LinkReceiver
  *   home. The escape lasts until any other app (or C3) comes to the front.
  * - Boot: Amazon home is usually shown before this service is connected, so C3 is opened
  *   once when the service connects shortly after boot.
+ * - Settings: Fire TV's settings run inside Amazon's launcher (same window class as its home).
+ *   When C3 opens them ([requestSettings]) the redirect pauses while the user stays in the
+ *   launcher/settings. HOME ends the pause and opens C3; for that the service watches keys
+ *   only during the pause (never consumed). Any other app or C3 in front ends it as well.
  *
  * Enable/disable via ADB or the C3 Updater (Fire OS hides the accessibility settings page).
  */
@@ -28,6 +36,8 @@ class HomeRedirectService : AccessibilityService() {
 
     private var lastRedirectAt = 0L
     private var escaped = false
+    private var settingsMode = false
+    private val handler = Handler(Looper.getMainLooper())
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -44,6 +54,7 @@ class HomeRedirectService : AccessibilityService() {
         val className = event.className?.toString().orEmpty()
 
         if (pkg != AMAZON_LAUNCHER) {
+            if (settingsMode && pkg !in SETTINGS_PACKAGES && pkg !in IGNORED_PACKAGES) endSettings("left for $pkg")
             // Any real app (or C3 itself) in front ends an escape. System overlays don't count.
             if (escaped && pkg !in IGNORED_PACKAGES) {
                 escaped = false
@@ -52,11 +63,18 @@ class HomeRedirectService : AccessibilityService() {
             return
         }
 
-        Log.d(TAG, "Amazon launcher window: $className (escaped=$escaped)")
+        Log.d(TAG, "Amazon launcher window: $className (escaped=$escaped, settings=$settingsMode)")
         if (!className.contains(HOME_ACTIVITY_MARKER)) return
-        if (escaped) return
 
         val now = SystemClock.elapsedRealtime()
+        if (now - settingsRequestedAt < ESCAPE_REQUEST_MS) {
+            settingsRequestedAt = 0L
+            startSettings()
+            return
+        }
+        if (settingsMode) return
+        if (escaped) return
+
         if (now - escapeRequestedAt < ESCAPE_REQUEST_MS) {
             // C3's own "Fire TV" button: the user explicitly wants Amazon home.
             escaped = true
@@ -73,6 +91,46 @@ class HomeRedirectService : AccessibilityService() {
 
         lastRedirectAt = now
         openC3()
+    }
+
+    private fun startSettings() {
+        settingsMode = true
+        setKeyFilter(true)
+        Log.i(TAG, "Settings opened by C3 – redirect paused")
+    }
+
+    private fun endSettings(reason: String) {
+        if (!settingsMode) return
+        settingsMode = false
+        setKeyFilter(false)
+        Log.i(TAG, "Settings pause ended ($reason)")
+    }
+
+    /** Key events are only requested during the settings pause. */
+    private fun setKeyFilter(enabled: Boolean) {
+        val info = serviceInfo ?: return
+        info.flags = if (enabled) {
+            info.flags or AccessibilityServiceInfo.FLAG_REQUEST_FILTER_KEY_EVENTS
+        } else {
+            info.flags and AccessibilityServiceInfo.FLAG_REQUEST_FILTER_KEY_EVENTS.inv()
+        }
+        serviceInfo = info
+    }
+
+    override fun onKeyEvent(event: KeyEvent): Boolean {
+        if (settingsMode && event.keyCode == KeyEvent.KEYCODE_HOME && event.action == KeyEvent.ACTION_DOWN) {
+            endSettings("HOME")
+            // HOME on Amazon home may not produce a window event: open C3 unless the normal
+            // redirect already did.
+            val pressedAt = SystemClock.elapsedRealtime()
+            handler.postDelayed({
+                if (lastRedirectAt < pressedAt && !escaped) {
+                    lastRedirectAt = SystemClock.elapsedRealtime()
+                    openC3()
+                }
+            }, HOME_FALLBACK_MS)
+        }
+        return false // never consume: HOME and all other keys work as usual
     }
 
     private fun openC3() {
@@ -106,14 +164,29 @@ class HomeRedirectService : AccessibilityService() {
         private const val ESCAPE_WINDOW_MS = 1200L
         private const val BOOT_WINDOW_MS = 5 * 60_000L
         private const val ESCAPE_REQUEST_MS = 3000L
+        private const val HOME_FALLBACK_MS = 700L
 
         @Volatile
         private var escapeRequestedAt = 0L
+
+        @Volatile
+        private var settingsRequestedAt = 0L
 
         /** Called by C3 before it opens Amazon home on purpose (same process). */
         fun requestEscape() {
             escapeRequestedAt = SystemClock.elapsedRealtime()
         }
+
+        /** Called by C3 before it opens the Fire TV settings (they live in Amazon's launcher). */
+        fun requestSettings() {
+            settingsRequestedAt = SystemClock.elapsedRealtime()
+        }
+
+        /** Settings pages outside the launcher (Netzwerk, Bluetooth, …) keep the settings pause. */
+        private val SETTINGS_PACKAGES = setOf(
+            "com.amazon.tv.settings.v2",
+            "com.amazon.tv.settings",
+        )
         private val IGNORED_PACKAGES = setOf(
             "android",
             "com.android.systemui",

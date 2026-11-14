@@ -31,9 +31,12 @@ import de.c3.tv.core.PcStore
 import de.c3.tv.core.SystemShortcuts
 import de.c3.tv.core.Tile
 import de.c3.tv.core.TvInputs
+import de.c3.tv.core.Weather
 import de.c3.tv.core.WebStore
 import de.c3.tv.core.dp
+import de.c3.tv.core.RecentApps
 import de.c3.tv.feature.diagnostics.DiagnosticsActivity
+import de.c3.tv.feature.tasks.TaskPanel
 import de.c3.tv.feature.inputs.InputPlayerActivity
 import de.c3.tv.redirect.HomeRedirectService
 import de.c3.tv.remote.LinkReceiver
@@ -48,6 +51,7 @@ import java.util.concurrent.Executors
  *
  * Rows: Favoriten (own order, catalog apps that are missing at the end), Geräte, Web, Privat.
  * Long press OK on an app opens its options (move, hide, show hidden again).
+ * MENU opens "Laufende Apps" (close recently used apps; diagnostics from there).
  */
 class MainActivity : Activity() {
 
@@ -93,8 +97,23 @@ class MainActivity : Activity() {
 
     private lateinit var content: View
     private lateinit var dock: View
-    private var options: OptionsPanel? = null
-    private var optionsAnchor: Tile? = null
+    private lateinit var recentApps: RecentApps
+    private lateinit var weather: Weather
+    private lateinit var weatherView: View
+    private lateinit var weatherIcon: ImageView
+    private lateinit var weatherText: TextView
+    private val weatherTick = object : Runnable {
+        override fun run() {
+            loadWeather()
+            mainHandler.postDelayed(this, Weather.REFRESH_MS)
+        }
+    }
+    /** Options panel or "Laufende Apps" over the home screen; focus behind it is blocked. */
+    private var overlay: View? = null
+    /** Key pressed down while the overlay was open; its release closes the overlay. */
+    private var overlayCloseKey: Int? = null
+    /** Gets the focus back when the overlay closes (tile or system bar button). */
+    private var optionsAnchor: View? = null
     private var movingTile: Tile? = null
 
     /** Focus to restore after a restart; dropped as soon as the user navigates. */
@@ -130,7 +149,10 @@ class MainActivity : Activity() {
         pcStore = PcStore(this)
         pcStatus = PcStatus(this) { states -> onPcStates(states) }
         webStore = WebStore(this)
+        recentApps = RecentApps(this)
+        weather = Weather(this)
         setContentView(buildLayout())
+        showWeather(weather.cached())
         handleConfigIntent(intent)
         pendingFocusKey = home.lastFocus
         initFirstRun()
@@ -173,14 +195,19 @@ class MainActivity : Activity() {
         super.onStart()
         started = true
         refresh()
+        // Reload now if the stored value is old, then every 15 minutes while visible.
+        mainHandler.removeCallbacks(weatherTick)
+        if (weather.isStale(weather.cached())) weatherTick.run()
+        else mainHandler.postDelayed(weatherTick, Weather.REFRESH_MS)
         pcStatus.start(pcStore.load().map { it.uuid })
     }
 
     override fun onStop() {
         super.onStop()
         started = false
+        mainHandler.removeCallbacks(weatherTick)
         if (movingTile != null) endMove()
-        closeOptions()
+        closeOverlay()
         (currentFocus as? Tile)?.key?.takeIf { it.isNotEmpty() }?.let { home.lastFocus = it }
         pcStatus.stop()
         io?.shutdownNow()
@@ -201,16 +228,19 @@ class MainActivity : Activity() {
             }
             return true // keep the tile in place while moving; volume etc. pass through
         }
-        if (options != null && (code == KeyEvent.KEYCODE_BACK || code == KeyEvent.KEYCODE_ESCAPE || code == KeyEvent.KEYCODE_MENU)) {
-            if (event.action == KeyEvent.ACTION_UP) closeOptions()
+        if (overlay != null && (code == KeyEvent.KEYCODE_BACK || code == KeyEvent.KEYCODE_ESCAPE || code == KeyEvent.KEYCODE_MENU)) {
+            // Close on release, but only for a press that started while the overlay was open:
+            // releasing the MENU press that opened "Laufende Apps" must not close it again.
+            if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) overlayCloseKey = code
+            if (event.action == KeyEvent.ACTION_UP && overlayCloseKey == code) closeOverlay()
             return true
         }
         return super.dispatchKeyEvent(event)
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
-        if (keyCode == KeyEvent.KEYCODE_MENU) {
-            startActivity(Intent(this, DiagnosticsActivity::class.java))
+        if (keyCode == KeyEvent.KEYCODE_MENU && event.repeatCount == 0) {
+            showTasks()
             return true
         }
         return super.onKeyDown(keyCode, event)
@@ -345,6 +375,25 @@ class MainActivity : Activity() {
             typeface = C3Fonts.semibold(context)
             setTextColor(getColor(R.color.c3_text))
         }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        // Weather (Coesfeld), left of the clock; hidden until a value is known.
+        weatherIcon = ImageView(context).apply {
+            imageTintList = context.getColorStateList(R.color.c3_text_secondary)
+        }
+        weatherText = TextView(context).apply {
+            textSize = 17f
+            typeface = C3Fonts.medium(context)
+            setTextColor(getColor(R.color.c3_text_secondary))
+        }
+        weatherView = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            visibility = View.GONE
+            addView(weatherIcon, LinearLayout.LayoutParams(dp(17), dp(17)).apply { marginEnd = dp(5) })
+            addView(weatherText)
+        }
+        addView(weatherView, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
+        ).apply { marginEnd = dp(16) })
         addView(TextClock(context).apply {
             format24Hour = "HH:mm"
             format12Hour = "HH:mm"
@@ -439,6 +488,8 @@ class MainActivity : Activity() {
                 }
                 setOnClickListener {
                     if (sc.iconRes == R.drawable.ic_home) HomeRedirectService.requestEscape()
+                    // Fire TV settings live in Amazon's launcher: pause the HOME redirect for them.
+                    if (sc.iconRes == R.drawable.ic_settings) HomeRedirectService.requestSettings()
                     if (!launcher.start(sc.intent)) toast("${sc.title} ist auf diesem Gerät nicht erreichbar")
                 }
             }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
@@ -623,7 +674,7 @@ class MainActivity : Activity() {
     // ---------------------------------------------------------------- options & moving
 
     private fun showOptions(tile: Tile) {
-        if (options != null || movingTile != null) return
+        if (overlay != null || movingTile != null) return
         val key = tile.key
         val pkg = key.takeIf { it.startsWith("app:") }?.removePrefix("app:")
         val title = tile.shelfTitle
@@ -638,19 +689,24 @@ class MainActivity : Activity() {
         }
         val hiddenCount = home.hidden().size
         if (hiddenCount > 0) items += "Ausgeblendete einblenden ($hiddenCount)" to { restoreHidden() }
-        val panel = OptionsPanel(this, title, items) { closeOptions() }
-        options = panel
+        val panel = OptionsPanel(this, title, items) { closeOverlay() }
         optionsAnchor = tile
+        showOverlay(panel, panel.firstButton)
+    }
+
+    private fun showOverlay(panel: View, focus: View) {
+        overlay = panel
+        overlayCloseKey = null
         setBehindFocusable(false)
         (window.decorView as ViewGroup).addView(panel, ViewGroup.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT,
         ))
-        panel.firstButton.requestFocus()
+        focus.requestFocus()
     }
 
-    private fun closeOptions() {
-        val panel = options ?: return
-        options = null
+    private fun closeOverlay() {
+        val panel = overlay ?: return
+        overlay = null
         (window.decorView as ViewGroup).removeView(panel)
         setBehindFocusable(true)
         val anchor = optionsAnchor
@@ -713,6 +769,61 @@ class MainActivity : Activity() {
         applyApps(computeModel())
         toast(if (count == 1) "1 App wieder eingeblendet" else "$count Apps wieder eingeblendet")
         if (currentFocus?.isShown != true) focusFirst()
+    }
+
+    // ---------------------------------------------------------------- weather
+
+    private fun loadWeather() {
+        Thread({
+            val now = weather.fetch() ?: return@Thread
+            mainHandler.post { if (!isDestroyed) showWeather(now) }
+        }, "c3-weather").start()
+    }
+
+    private fun showWeather(now: Weather.Now?) {
+        if (now == null) return // keep the last shown value (or nothing) on errors
+        weatherIcon.setImageResource(now.iconRes)
+        weatherText.text = now.text
+        weatherView.contentDescription = "Coesfeld: ${now.description}, ${now.text}"
+        weatherView.visibility = View.VISIBLE
+    }
+
+    // ---------------------------------------------------------------- Laufende Apps (MENU)
+
+    private fun showTasks() {
+        if (overlay != null || movingTile != null) return
+        optionsAnchor = currentFocus
+        Thread({
+            val hasAccess = recentApps.hasUsageAccess()
+            val entries = recentApps.load(launcher, TASK_EXCLUDED)
+            entries.forEach { e ->
+                if (!artwork.containsKey(e.pkg)) {
+                    val art = launcher.loadArtwork(e.pkg)
+                    artwork[e.pkg] = Art(art, art?.drawable?.let { Glow.fromDrawable(it) })
+                }
+            }
+            mainHandler.post {
+                if (isDestroyed || !started || overlay != null) return@post
+                val panel = TaskPanel(
+                    this, entries, hasAccess,
+                    artwork = { pkg ->
+                        // Own copy: the same banner may be shown by a favourite tile at the same time.
+                        artwork[pkg]?.artwork?.let { a -> (a.drawable.constantState?.newDrawable() ?: a.drawable) to a.isBanner }
+                    },
+                    onCloseApp = { recentApps.close(it.pkg) },
+                    onCloseAll = { list ->
+                        list.forEach { recentApps.close(it.pkg) }
+                        closeOverlay()
+                        toast(if (list.size == 1) "1 App geschlossen" else "${list.size} Apps geschlossen")
+                    },
+                    onDiagnostics = {
+                        closeOverlay()
+                        startActivity(Intent(this, DiagnosticsActivity::class.java))
+                    },
+                )
+                showOverlay(panel, panel.firstFocus)
+            }
+        }, "c3-tasks").start()
     }
 
     // ---------------------------------------------------------------- state
@@ -894,6 +1005,14 @@ class MainActivity : Activity() {
         private const val GLOW_FADE_MS = 320L
         private const val PLAYSTATION_BLUE = 0xFF2F6FE0.toInt()
         private const val KEY_RESTORE = "hidden"
+
+        /** System parts of Fire OS that are not "apps" in the task list. */
+        private val TASK_EXCLUDED = setOf(
+            "com.amazon.tv.launcher",
+            "com.amazon.tv.settings.v2",
+            "com.amazon.firehomestarter",
+            "com.amazon.tv.quicksettings.ui",
+        )
 
         private val MOVE_KEYS = setOf(
             KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN,

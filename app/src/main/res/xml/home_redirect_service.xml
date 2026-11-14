@@ -1,10 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Minimal footprint: only window-state events (which app is in front), no window content.
-     All packages are needed so that an escape to Amazon home ends when another app opens. -->
+     All packages are needed so that an escape to Amazon home ends when another app opens.
+     canRequestFilterKeyEvents: key events are requested at runtime only while Fire TV settings
+     opened from C3 are shown (to notice HOME there); keys are never consumed. -->
 <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
     android:accessibilityEventTypes="typeWindowStateChanged"
     android:accessibilityFeedbackType="feedbackGeneric"
     android:accessibilityFlags="flagDefault"
+    android:canRequestFilterKeyEvents="true"
     android:canRetrieveWindowContent="false"
     android:description="@string/redirect_description"
     android:notificationTimeout="0" />

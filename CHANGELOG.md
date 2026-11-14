@@ -2,6 +2,47 @@
 
 Version: Datei `VERSION` (x.y.z).
 
+## 0.11.0
+
+- Updater, „Amazon entrümpeln“: neue Haken **Alexa und Sprachsuche** (Sprachsteuerung,
+  Alexa-Musik, Cloud-Verbindung, alle `com.amazon.alexa*`-Pakete) und
+  **Live-TV-Browser (HbbTV)** (alle `com.vewd.*`-Pakete). Laut Messung am TV zusammen ~120 MB.
+  Die Sicherheitsabfrage nennt die Nebenwirkungen, „Rückgängig“ deckt beides ab.
+
+## 0.10.1
+
+- Updater: „Entrümpeln“ zeigt danach die 15 größten Speicherverbraucher am TV, misst den
+  Speicher erst nach einer kurzen Pause und meldet von Amazon geschützte Pakete in einer Zeile.
+
+## 0.10.0
+
+- Updater: Karte **Amazon entrümpeln** schaltet Werbung, Datensammlung (u. a. Inhaltserkennung)
+  und ungenutzte Amazon-Dienste per ADB ab, ohne Root und ohne etwas zu löschen.
+  Optional auch Fotos, Musik, Casting und Benachrichtigungen. **Rückgängig** schaltet alles
+  wieder ein. Das Protokoll zeigt jedes Paket und den freien Arbeitsspeicher vorher/nachher.
+
+## 0.9.1
+
+- TV: „Einstellungen“ in der Systemleiste öffnet die Fire-TV-Einstellungen auch bei
+  eingeschalteter Home-Umleitung (vorher sprang C3 sofort zurück). Home in den
+  Einstellungen führt wie gewohnt zu C3.
+
+## 0.9.0
+
+- TV: aktuelles Wetter für Coesfeld oben links neben der Uhr (Symbol + Temperatur),
+  aktualisiert alle 15 Minuten, solange der Homescreen sichtbar ist (Quelle: Open-Meteo).
+
+## 0.8.1
+
+- TV: „Laufende Apps“ bleibt nach dem Loslassen der Menü-Taste offen.
+
+## 0.8.0
+
+- TV: Die **Menü-Taste ☰** öffnet „Laufende Apps“: zuletzt benutzte Apps mit Banner,
+  OK schließt eine App, dazu „Alle schließen“. Die Diagnose ist von dort erreichbar.
+- Updater: erteilt beim „TV aktualisieren“ den dafür nötigen Nutzungszugriff
+  (Rückweg: `adb shell appops set de.c3.tv GET_USAGE_STATS default`).
+
 ## 0.7.0
 
 - TV: Reihe **Favoriten** statt fester Apps. Nicht installierte Apps stehen blass am Ende.

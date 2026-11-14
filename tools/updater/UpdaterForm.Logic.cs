@@ -168,7 +168,9 @@ namespace C3
 
         // ------------------------------------------------------------------ workflow
 
-        enum Job { Update, Start, RedirectOn, RedirectOff, AddPc, RemovePc, InstallSunshine, PrivateOn, PrivateOff }
+        enum Job { Update, Start, RedirectOn, RedirectOff, AddPc, RemovePc, InstallSunshine, PrivateOn, PrivateOff, Debloat, Restore }
+
+        bool debloatExtended = true, debloatAlexa = true, debloatVewd = true;
 
         void RunAsync(Job job)
         {
@@ -179,6 +181,20 @@ namespace C3
                 return;
             }
             if (ip.Length > 0) RememberIp(ip);
+            if (job == Job.Debloat)
+            {
+                var answer = MessageBox.Show(this,
+                    "Amazon-Werbung, Datensammlung und ungenutzte Dienste am TV abschalten?\n\n" +
+                    (debloatAlexaCheck.Checked ? "Alexa und die Sprachsuche der Fernbedienung funktionieren danach nicht mehr.\n" : "") +
+                    (debloatVewdCheck.Checked ? "HbbTV im Live-TV (Antenne/Kabel) funktioniert danach nicht mehr.\n" : "") +
+                    "\nEs wird nichts gelöscht. „Rückgängig“ schaltet alles wieder ein.",
+                    "Amazon entrümpeln", MessageBoxButtons.OKCancel, MessageBoxIcon.Question);
+                if (answer != DialogResult.OK) return;
+            }
+            // read on the UI thread
+            debloatExtended = debloatExtendedCheck.Checked;
+            debloatAlexa = debloatAlexaCheck.Checked;
+            debloatVewd = debloatVewdCheck.Checked;
             SetBusy(true);
             log.Clear();
 
@@ -197,6 +213,8 @@ namespace C3
                         case Job.InstallSunshine: DoInstallSunshine(); break;
                         case Job.PrivateOn: DoPrivate(ip, true); break;
                         case Job.PrivateOff: DoPrivate(ip, false); break;
+                        case Job.Debloat: DoDebloat(ip, debloatExtended, debloatAlexa, debloatVewd); break;
+                        case Job.Restore: DoRestore(ip); break;
                     }
                 }
                 catch (Exception e)
@@ -248,6 +266,11 @@ namespace C3
                 Status("Installation fehlgeschlagen.");
                 return;
             }
+
+            // "Laufende Apps" (Menü-Taste) braucht den Nutzungszugriff; auf Fire TV nur per adb.
+            // Rückweg: adb shell appops set de.c3.tv GET_USAGE_STATS default
+            Adb("-s " + serial + " shell appops set " + PackageName + " GET_USAGE_STATS allow", 15000);
+            Log("Nutzungszugriff für „Laufende Apps“ erteilt.");
 
             Adb("-s " + serial + " shell am start -n " + MainActivity, 20000);
             if (pcs.Count > 0) PushPcs(serial);

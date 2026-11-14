@@ -63,6 +63,43 @@ Status der HOME-Umleitung bleibt 🟡, ist aber technisch weiter möglich.
 
 **0.3.1-p2 (am Gerät bestätigt):** Doppel-Home-Fenster 1,2 s; Ausstieg endet, sobald eine andere App/C3 vorne ist; C3 öffnet sich nach dem Einschalten (Dienst verbindet sich nach Amazon-Home). Bekannte Grenze: HOME *auf* Amazon-Home erzeugt kein Fensterereignis → Rückweg über C3 in Amazons Favoritenleiste.
 
+**0.9.1 (Nutzerbericht):** Die Fire-TV-Einstellungen (`android.settings.SETTINGS` →
+`com.amazon.tv.launcher/.ui.SettingsActivity`) laufen in Amazons Launcher und erscheinen mit
+einer `HomeActivity`-Fensterklasse → die Umleitung holte sofort C3 zurück. Lösung: C3 meldet
+das Öffnen vorher (`requestSettings`), die Umleitung pausiert, solange Launcher oder
+`com.amazon.tv.settings.v2` vorne sind. Home beendet die Pause; dafür fordert der Dienst
+**nur während der Pause** Tastenereignisse an (`canRequestFilterKeyEvents`, nie verbraucht).
+🟡 Am Gerät zu bestätigen: ob Fire OS die Home-Taste an den Dienst liefert. Falls nicht, führt
+Home aus den Einstellungen zu Amazon-Home; ein weiterer Start von C3 beendet die Pause.
+
+## 4a. Amazon entrümpeln (0.10.0, ungetestet)
+
+Updater-Karte „Amazon entrümpeln“: `pm disable-user --user 0` für eine kuratierte Liste
+(`tools/updater/Debloat.cs`), Rückweg `pm enable` über „Rückgängig“ oder Werkseinstellungen.
+Quellen: Community-Listen für Fire-TV-Sticks/Cube (JLCareglio-Gist, dumbtv.org, XDA Cube 3,
+cleanyourtv). Bewusst **nicht** abgeschaltet: Launcher (Home-Umleitung), Einstellungen,
+Appstore, Tastatur, HDMI/Eingänge, Fernbedienung, WebView, OTA, Uhrzeit, Prime Video, Netflix,
+Silk sowie `com.amazon.imp` (zerstörte laut Quelle Home).
+
+**Ergebnis am Gerät (2026-11-14, Fire OS 8.1.8.5):** 22 von 28 abgeschaltet ✅.
+Von Amazon geschützt (`SecurityException: Cannot disable a protected package`):
+`com.amazon.device.crashmanager`, `com.amazon.ftvads.deeplinking`. Nicht vorhanden:
+`com.amazon.shoptv.firetv.client`, `com.amazon.device.sale.service`,
+`com.amazon.imdb.tv.android.app`, `com.amazon.communication.discovery`.
+Arbeitsspeicher frei 553 → 549 MB direkt danach: **kein messbarer Gewinn** – die Pakete liefen
+kaum dauerhaft. Nutzen: weniger Hintergrund-/Netzverkehr, ACR aus. Für spürbar mehr Tempo
+müssen die echten Verbraucher bekannt sein (ab 0.10.1 im Protokoll).
+
+**Größte Verbraucher (PSS, nach dem Entrümpeln, C3 im Vordergrund):** system 140 MB,
+`com.amazon.tv.launcher` 115, `de.c3.tv` 82, surfaceflinger 67, `com.amazon.venezia` 44,
+`com.amazon.vizzini` 39, `com.amazon.device.services` 35, systemui 26, `com.amazon.tcomm` 25,
+`com.vewd.core.service:browser_process` 24, `com.amazon.alexa.externalmediaplayer.fireos` 19,
+`com.amazon.tv.devicecontrol` 18, `com.amazon.tv.settings.v2` 17, Audio-HAL 16,
+`com.amazon.alexamediaplayer.runtime.ftv` 15.
+→ 0.11.0: optionale Gruppen **Alexa** (vizzini, tcomm, `com.amazon.alexa*`) und **Vewd**
+(`com.vewd.*`, HbbTV für Antenne/Kabel) – der Nutzer nutzt weder Alexa noch Live-TV.
+Bleiben an: Launcher (Home-Umleitung), Appstore (Lizenzen), device.services, devicecontrol (CEC).
+
 ## 5. Streaming-Apps
 
 | App | Paket / Start-Activity | Status |

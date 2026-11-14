@@ -12,9 +12,11 @@ Läuft als normale App auf Fire OS: keine Firmware-Änderung, kein Root, jederze
 | **Home-Taste** | führt zu C3, zweimal drücken führt zu Amazon |
 | **Privat** | Browser und eigene Seiten, nur sichtbar, solange im Updater eingeschaltet |
 | **An C3 TV senden** | Links vom iPhone per Kurzbefehl am TV öffnen (nur bei „Privat an“) |
+| **Wetter** | aktuelles Wetter in Coesfeld neben der Uhr (Open-Meteo, ohne Konto) |
 | **Systemleiste** | Einstellungen, Netzwerk, Bluetooth, Geräteinfo, Fire TV |
 
-Auf dem Homescreen öffnet die **Menü-Taste ☰** die Diagnose.
+Auf dem Homescreen öffnet die **Menü-Taste ☰** „Laufende Apps“: OK schließt eine App,
+dazu „Alle schließen“ und die Diagnose.
 **OK lang drücken** auf einer App öffnet ihre Optionen (Verschieben, Ausblenden, Ausgeblendete einblenden).
 
 ## Installation
@@ -36,6 +38,7 @@ Mit dem Haken **Entwicklerversion** nutzt er den Testkanal
 - **Privat:** Seiten verwalten (auf dem PC verschlüsselt gespeichert), **Privat an**, **Privat aus**
   (löscht die Silk-Daten), iPhone für „An C3 TV senden“ einrichten
 - **Sunshine:** erkennen und per winget installieren
+- **Amazon entrümpeln:** Werbung, Datensammlung und ungenutzte Amazon-Dienste abschalten, **Rückgängig** jederzeit
 
 ## Rückweg
 
@@ -43,7 +46,11 @@ Mit dem Haken **Entwicklerversion** nutzt er den Testkanal
 adb uninstall de.c3.tv
 ```
 
-Damit ist alles entfernt. Fire OS und der Amazon-Homescreen bleiben dabei unverändert.
+Damit ist alles entfernt, auch der Nutzungszugriff für „Laufende Apps“, den der Updater
+erteilt (einzeln zurücknehmen: `adb shell appops set de.c3.tv GET_USAGE_STATS default`).
+Fire OS und der Amazon-Homescreen bleiben dabei unverändert.
+Mit „Amazon entrümpeln“ abgeschaltete Dienste schaltet im Updater **Rückgängig** wieder ein
+(das bleibt auch nach dem Entfernen von C3 nötig).
 
 ## Projekt
 
