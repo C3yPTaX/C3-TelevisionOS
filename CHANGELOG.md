@@ -2,6 +2,12 @@
 
 Version: Datei `VERSION` (x.y.z).
 
+## 0.9.1
+
+- TV: „Einstellungen“ in der Systemleiste öffnet die Fire-TV-Einstellungen auch bei
+  eingeschalteter Home-Umleitung (vorher sprang C3 sofort zurück). Home in den
+  Einstellungen führt wie gewohnt zu C3.
+
 ## 0.9.0
 
 - TV: aktuelles Wetter für Coesfeld oben links neben der Uhr (Symbol + Temperatur),

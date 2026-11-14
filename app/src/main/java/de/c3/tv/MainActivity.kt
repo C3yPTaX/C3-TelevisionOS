@@ -488,6 +488,8 @@ class MainActivity : Activity() {
                 }
                 setOnClickListener {
                     if (sc.iconRes == R.drawable.ic_home) HomeRedirectService.requestEscape()
+                    // Fire TV settings live in Amazon's launcher: pause the HOME redirect for them.
+                    if (sc.iconRes == R.drawable.ic_settings) HomeRedirectService.requestSettings()
                     if (!launcher.start(sc.intent)) toast("${sc.title} ist auf diesem Gerät nicht erreichbar")
                 }
             }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {

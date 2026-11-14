@@ -63,6 +63,15 @@ Status der HOME-Umleitung bleibt 🟡, ist aber technisch weiter möglich.
 
 **0.3.1-p2 (am Gerät bestätigt):** Doppel-Home-Fenster 1,2 s; Ausstieg endet, sobald eine andere App/C3 vorne ist; C3 öffnet sich nach dem Einschalten (Dienst verbindet sich nach Amazon-Home). Bekannte Grenze: HOME *auf* Amazon-Home erzeugt kein Fensterereignis → Rückweg über C3 in Amazons Favoritenleiste.
 
+**0.9.1 (Nutzerbericht):** Die Fire-TV-Einstellungen (`android.settings.SETTINGS` →
+`com.amazon.tv.launcher/.ui.SettingsActivity`) laufen in Amazons Launcher und erscheinen mit
+einer `HomeActivity`-Fensterklasse → die Umleitung holte sofort C3 zurück. Lösung: C3 meldet
+das Öffnen vorher (`requestSettings`), die Umleitung pausiert, solange Launcher oder
+`com.amazon.tv.settings.v2` vorne sind. Home beendet die Pause; dafür fordert der Dienst
+**nur während der Pause** Tastenereignisse an (`canRequestFilterKeyEvents`, nie verbraucht).
+🟡 Am Gerät zu bestätigen: ob Fire OS die Home-Taste an den Dienst liefert. Falls nicht, führt
+Home aus den Einstellungen zu Amazon-Home; ein weiterer Start von C3 beendet die Pause.
+
 ## 5. Streaming-Apps
 
 | App | Paket / Start-Activity | Status |
