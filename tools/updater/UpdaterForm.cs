@@ -1,5 +1,8 @@
 // C3 Updater – Oberfläche im Stil von C3 Television OS.
-// Karten: Fernseher · Home-Taste · C3 Desktop (PCs) · Dieser PC (Sunshine). Protokoll einklappbar.
+// Zwei Spalten, damit das Fenster auf Laptop-Bildschirme passt:
+//   links  Fernseher · Home-Taste · C3 Desktop (PCs)
+//   rechts Privat · Dieser PC (Sunshine)
+// Darunter Status und einklappbares Protokoll über die volle Breite.
 
 using System;
 using System.Drawing;
@@ -9,9 +12,12 @@ namespace C3
 {
     public partial class UpdaterForm : Form
     {
-        const int W = 620;
         const int CardW = 572;
         const int Gutter = 24;
+        const int ColGap = 20;
+        const int LeftX = Gutter;
+        const int RightX = Gutter + CardW + ColGap;
+        const int W = RightX + CardW + Gutter;
 
         readonly Pill tvPill = new Pill();
         readonly DarkCombo deviceBox = new DarkCombo();
@@ -76,9 +82,11 @@ namespace C3
             Controls.AddRange(new Control[] { logo, title, subtitle, tvPill });
             SetTvStatus(false, null);
             y += 64;
+            int top = y;
 
+            // ================================================================ linke Spalte
             // ---------------------------------------------------------------- Fernseher
-            var tv = NewCard(y, 182);
+            var tv = NewCard(LeftX, y, 182);
             tv.Controls.Add(CardLabel("Fernseher", 16, 12));
             Place(tv, deviceBox, 16, 40, 400, 30);
             deviceBox.SelectedIndexChanged += delegate { OnDeviceSelected(); };
@@ -99,7 +107,7 @@ namespace C3
             y += 182 + 14;
 
             // ---------------------------------------------------------------- Home-Taste
-            var home = NewCard(y, 70);
+            var home = NewCard(LeftX, y, 70);
             home.Controls.Add(CardLabel("Home-Taste", 16, 14, Theme.Fg));
             home.Controls.Add(new Label { Text = "2× Home führt jederzeit zu Amazon", ForeColor = Theme.Muted, Font = Theme.Font(9f, false), AutoSize = true, Location = new Point(16, 38), BackColor = Theme.Card });
             Setup(redirectOnButton, "C3", false);
@@ -113,7 +121,7 @@ namespace C3
             y += 70 + 14;
 
             // ---------------------------------------------------------------- PCs
-            var pcCard = NewCard(y, 132);
+            var pcCard = NewCard(LeftX, y, 132);
             pcCard.Controls.Add(CardLabel("C3 Desktop · PCs", 16, 12));
             Place(pcCard, pcBox, 16, 40, 400, 30);
             Setup(removePcButton, "Entfernen", false);
@@ -122,10 +130,13 @@ namespace C3
             Setup(addPcButton, "+  Diesen PC hinzufügen", false);
             Place(pcCard, addPcButton, 16, 82, 540, 36);
             addPcButton.Click += delegate { RunAsync(Job.AddPc); };
-            y += 132 + 14;
+            y += 132;
+            int leftBottom = y;
 
+            // ================================================================ rechte Spalte
+            y = top;
             // ---------------------------------------------------------------- Privat
-            var priv = NewCard(y, 220);
+            var priv = NewCard(RightX, y, 220);
             priv.Controls.Add(CardLabel("Privat", 16, 12));
             privatePill.Height = 22;
             privatePill.Location = new Point(CardW - 16 - 60, 12);
@@ -152,7 +163,7 @@ namespace C3
             y += 220 + 14;
 
             // ---------------------------------------------------------------- Sunshine
-            var sun = NewCard(y, 186);
+            var sun = NewCard(RightX, y, 186);
             sun.Controls.Add(CardLabel("Dieser PC · Sunshine", 16, 12));
             sunshinePill.Height = 22;
             sunshinePill.Location = new Point(CardW - 16 - 120, 12);
@@ -171,7 +182,8 @@ namespace C3
             sunshineButton.Enabled = false;
             Place(sun, sunshineButton, 16, 136, 540, 36);
             sunshineButton.Click += delegate { OnSunshineButton(); };
-            y += 186 + 12;
+            y += 186;
+            y = Math.Max(y, leftBottom) + 14;
 
             // ---------------------------------------------------------------- footer + log
             statusLabel.Location = new Point(Gutter + 2, y);
@@ -196,7 +208,7 @@ namespace C3
             devCheck.Checked = LoadDevChannel();
             useDevChannel = devCheck.Checked;
             devCheck.CheckedChanged += delegate { useDevChannel = devCheck.Checked; SaveDevChannel(useDevChannel); };
-            statusLabel.Size = new Size(290, 22);
+            statusLabel.Size = new Size(W - 2 * Gutter - 280, 22);
             Controls.Add(statusLabel);
             Controls.Add(devCheck);
             Controls.Add(detailsLink);
@@ -204,7 +216,7 @@ namespace C3
             collapsedHeight = y + 8;
 
             log.Location = new Point(Gutter, y);
-            log.Size = new Size(CardW, 190);
+            log.Size = new Size(W - 2 * Gutter, 190);
             log.Multiline = true;
             log.ReadOnly = true;
             log.ScrollBars = ScrollBars.Vertical;
@@ -233,9 +245,9 @@ namespace C3
 
         // ------------------------------------------------------------------ layout helpers
 
-        Card NewCard(int y, int height)
+        Card NewCard(int x, int y, int height)
         {
-            var c = new Card { Location = new Point(Gutter, y), Size = new Size(CardW, height) };
+            var c = new Card { Location = new Point(x, y), Size = new Size(CardW, height) };
             Controls.Add(c);
             return c;
         }
@@ -286,17 +298,18 @@ namespace C3
             return System.IO.Path.Combine(System.IO.Path.GetDirectoryName(devicesPath), "channel-dev.txt");
         }
 
-        /// Fits the window on small or scaled screens; content scrolls if it is taller.
+        /// Fits the window on small or scaled screens; content scrolls if it does not fit.
         void ApplyHeight(int desired)
         {
-            int max = Screen.FromPoint(Cursor.Position).WorkingArea.Height - 60;
-            if (desired <= max)
-            {
-                ClientSize = new Size(W, desired);
-                return;
-            }
-            ClientSize = new Size(W + SystemInformation.VerticalScrollBarWidth, max);
-            AutoScrollMinSize = new Size(W, desired);
+            var area = Screen.FromPoint(Cursor.Position).WorkingArea;
+            int maxH = area.Height - 60;
+            int maxW = area.Width - 40;
+            bool scrollX = W > maxW;
+            bool scrollY = desired > maxH;
+            int w = scrollX ? maxW : W + (scrollY ? SystemInformation.VerticalScrollBarWidth : 0);
+            int h = scrollY ? maxH : desired + (scrollX ? SystemInformation.HorizontalScrollBarHeight : 0);
+            AutoScrollMinSize = (scrollX || scrollY) ? new Size(W, desired) : Size.Empty;
+            ClientSize = new Size(Math.Min(w, maxW), Math.Min(h, maxH));
         }
 
         void ToggleDetails()
