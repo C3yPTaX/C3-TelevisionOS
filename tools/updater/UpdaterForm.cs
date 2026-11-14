@@ -46,6 +46,7 @@ namespace C3
         readonly RoundButton sunshineButton = new RoundButton();
         readonly Label statusLabel = new Label();
         readonly LinkLabel detailsLink = new LinkLabel();
+        readonly LinkLabel selfUpdateLink = new LinkLabel();
         readonly CheckBox devCheck = new CheckBox();
         readonly TextBox log = new TextBox();
 
@@ -207,8 +208,22 @@ namespace C3
             devCheck.Location = new Point(W - Gutter - 104 - 150, y);
             devCheck.Checked = LoadDevChannel();
             useDevChannel = devCheck.Checked;
-            devCheck.CheckedChanged += delegate { useDevChannel = devCheck.Checked; SaveDevChannel(useDevChannel); };
-            statusLabel.Size = new Size(W - 2 * Gutter - 280, 22);
+            devCheck.CheckedChanged += delegate
+            {
+                useDevChannel = devCheck.Checked;
+                SaveDevChannel(useDevChannel);
+                ResetSelfUpdateLink();
+                CheckSelfUpdateAsync();
+            };
+            selfUpdateLink.AutoSize = true;
+            selfUpdateLink.ActiveLinkColor = Theme.AccentHover;
+            selfUpdateLink.LinkBehavior = LinkBehavior.HoverUnderline;
+            selfUpdateLink.Font = Theme.Font(9.5f, false);
+            selfUpdateLink.Location = new Point(0, y);
+            selfUpdateLink.LinkClicked += delegate { OnSelfUpdateClicked(); };
+            ResetSelfUpdateLink();
+            Controls.Add(selfUpdateLink);
+            statusLabel.Size = new Size(W - 2 * Gutter - 460, 22);
             Controls.Add(statusLabel);
             Controls.Add(devCheck);
             Controls.Add(detailsLink);
@@ -235,6 +250,8 @@ namespace C3
             LoadPcs();
             LoadSites();
             DetectSystemAsync();
+            CleanupOldExe();
+            CheckSelfUpdateAsync();
         }
 
         protected override void OnHandleCreated(EventArgs e)
@@ -310,6 +327,20 @@ namespace C3
             int h = scrollY ? maxH : desired + (scrollX ? SystemInformation.HorizontalScrollBarHeight : 0);
             AutoScrollMinSize = (scrollX || scrollY) ? new Size(W, desired) : Size.Empty;
             ClientSize = new Size(Math.Min(w, maxW), Math.Min(h, maxH));
+        }
+
+        void ResetSelfUpdateLink()
+        {
+            selfUpdateLink.Text = "Updater aktualisieren";
+            selfUpdateLink.LinkColor = Theme.Accent;
+            LayoutFooterLinks();
+        }
+
+        /// Keeps the updater link left of "Entwicklerversion" and the status text left of it.
+        void LayoutFooterLinks()
+        {
+            selfUpdateLink.Left = devCheck.Left - 20 - selfUpdateLink.PreferredWidth;
+            statusLabel.Width = Math.Max(120, selfUpdateLink.Left - 12 - statusLabel.Left);
         }
 
         void ToggleDetails()
