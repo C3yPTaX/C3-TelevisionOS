@@ -22,8 +22,12 @@ class WebStore(context: Context) {
     fun privateSites(): List<Site> =
         if (prefs.getBoolean(KEY_ENABLED, false)) parse(prefs.getString(KEY_SITES, "").orEmpty()) else emptyList()
 
+    /** Secret code for "An C3 TV senden"; null while the private area is off. */
+    fun receiverToken(): String? =
+        if (prefs.getBoolean(KEY_ENABLED, false)) prefs.getString(KEY_TOKEN, null)?.takeIf { it.length >= 12 } else null
+
     /** Applies an update from the C3 Updater; returns the active private sites. */
-    fun apply(enabled: Boolean, raw: String): List<Site> {
+    fun apply(enabled: Boolean, raw: String, token: String? = null): List<Site> {
         if (!enabled) {
             prefs.edit().clear().apply()
             return emptyList()
@@ -32,6 +36,7 @@ class WebStore(context: Context) {
         prefs.edit()
             .putBoolean(KEY_ENABLED, true)
             .putString(KEY_SITES, sites.joinToString(";") { "${it.name}|${it.url}" })
+            .putString(KEY_TOKEN, token?.trim()?.takeIf { it.matches(Regex("^[A-Za-z0-9]{12,64}$")) })
             .apply()
         return sites
     }
@@ -40,9 +45,11 @@ class WebStore(context: Context) {
         const val ACTION_SET_PRIVATE = "de.c3.tv.action.SET_PRIVATE"
         const val EXTRA_SITES = "de.c3.tv.extra.SITES"
         const val EXTRA_ENABLED = "de.c3.tv.extra.ENABLED"
+        const val EXTRA_TOKEN = "de.c3.tv.extra.TOKEN"
         const val SILK_PACKAGE = "com.amazon.cloud9"
         private const val KEY_ENABLED = "enabled"
         private const val KEY_SITES = "sites"
+        private const val KEY_TOKEN = "token"
 
         val silk = AppEntry("Browser", listOf(SILK_PACKAGE))
 

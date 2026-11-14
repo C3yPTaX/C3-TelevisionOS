@@ -16,6 +16,7 @@ namespace C3
     {
         const string SilkPackage = "com.amazon.cloud9";
         readonly List<Site> sites = new List<Site>();
+        string receiverToken;
 
         class Site
         {
@@ -39,6 +40,7 @@ namespace C3
                     byte[] plain = ProtectedData.Unprotect(File.ReadAllBytes(PrivatePath()), null, DataProtectionScope.CurrentUser);
                     foreach (string line in Encoding.UTF8.GetString(plain).Split('\n'))
                     {
+                        if (line.StartsWith("#token=")) { receiverToken = line.Substring(7).Trim(); continue; }
                         int sep = line.IndexOf('|');
                         if (sep <= 0) continue;
                         sites.Add(new Site { Name = line.Substring(0, sep), Url = line.Substring(sep + 1).Trim() });
@@ -52,6 +54,7 @@ namespace C3
         void SaveSites()
         {
             var sb = new StringBuilder();
+            if (!string.IsNullOrEmpty(receiverToken)) sb.Append("#token=").Append(receiverToken).Append('\n');
             foreach (Site s in sites) sb.Append(s.Name).Append('|').Append(s.Url).Append('\n');
             try
             {
@@ -124,7 +127,8 @@ namespace C3
                 foreach (Site s in sites) parts.Add(s.Name + "|" + s.Url);
                 Adb("-s " + serial + " shell am start -n " + MainActivity +
                     " -a de.c3.tv.action.SET_PRIVATE --ez de.c3.tv.extra.ENABLED true --es de.c3.tv.extra.SITES '" +
-                    string.Join(";", parts.ToArray()) + "'", 20000);
+                    string.Join(";", parts.ToArray()) + "' --es de.c3.tv.extra.TOKEN " + EnsureToken(), 20000);
+                Log("An C3 TV senden: aktiv (iPhone einrichten → Karte Privat).");
                 Log("Privat an: " + sites.Count + " Seiten gesendet.");
                 UI(delegate { SetPrivateState(true); });
                 Status(installed ? "Privat ist an." : "Privat ist an – Silk bitte im Appstore installieren.");
@@ -149,6 +153,42 @@ namespace C3
             Adb("-s " + serial + " shell am start -n " + MainActivity, 20000);
             UI(delegate { SetPrivateState(false); });
             Status("Privat ist aus. Silk-Verlauf gelöscht.");
+        }
+
+        /// Secret code for the iPhone shortcut; created once, stored encrypted with the sites.
+        string EnsureToken()
+        {
+            if (string.IsNullOrEmpty(receiverToken))
+            {
+                receiverToken = NewToken();
+                SaveSites();
+            }
+            return receiverToken;
+        }
+
+        static string NewToken()
+        {
+            const string alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+            var bytes = new byte[20];
+            using (var rng = new RNGCryptoServiceProvider()) rng.GetBytes(bytes);
+            var sb = new StringBuilder();
+            foreach (byte b in bytes) sb.Append(alphabet[b % alphabet.Length]);
+            return sb.ToString();
+        }
+
+        void ShowIphoneSetup()
+        {
+            string token = EnsureToken();
+            using (var dlg = new IphoneSetupForm(token, ipBox.Text.Trim(), delegate
+            {
+                receiverToken = NewToken();
+                SaveSites();
+                return receiverToken;
+            }))
+            {
+                dlg.ShowDialog(this);
+            }
+            Status("Neuer Code wird mit \"Privat an\" an den TV übertragen.");
         }
 
         void SetPrivateState(bool on)
