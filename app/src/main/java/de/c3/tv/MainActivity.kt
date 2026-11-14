@@ -31,6 +31,7 @@ import de.c3.tv.core.PcStore
 import de.c3.tv.core.SystemShortcuts
 import de.c3.tv.core.Tile
 import de.c3.tv.core.TvInputs
+import de.c3.tv.core.Weather
 import de.c3.tv.core.WebStore
 import de.c3.tv.core.dp
 import de.c3.tv.core.RecentApps
@@ -97,6 +98,16 @@ class MainActivity : Activity() {
     private lateinit var content: View
     private lateinit var dock: View
     private lateinit var recentApps: RecentApps
+    private lateinit var weather: Weather
+    private lateinit var weatherView: View
+    private lateinit var weatherIcon: ImageView
+    private lateinit var weatherText: TextView
+    private val weatherTick = object : Runnable {
+        override fun run() {
+            loadWeather()
+            mainHandler.postDelayed(this, Weather.REFRESH_MS)
+        }
+    }
     /** Options panel or "Laufende Apps" over the home screen; focus behind it is blocked. */
     private var overlay: View? = null
     /** Key pressed down while the overlay was open; its release closes the overlay. */
@@ -139,7 +150,9 @@ class MainActivity : Activity() {
         pcStatus = PcStatus(this) { states -> onPcStates(states) }
         webStore = WebStore(this)
         recentApps = RecentApps(this)
+        weather = Weather(this)
         setContentView(buildLayout())
+        showWeather(weather.cached())
         handleConfigIntent(intent)
         pendingFocusKey = home.lastFocus
         initFirstRun()
@@ -182,12 +195,17 @@ class MainActivity : Activity() {
         super.onStart()
         started = true
         refresh()
+        // Reload now if the stored value is old, then every 15 minutes while visible.
+        mainHandler.removeCallbacks(weatherTick)
+        if (weather.isStale(weather.cached())) weatherTick.run()
+        else mainHandler.postDelayed(weatherTick, Weather.REFRESH_MS)
         pcStatus.start(pcStore.load().map { it.uuid })
     }
 
     override fun onStop() {
         super.onStop()
         started = false
+        mainHandler.removeCallbacks(weatherTick)
         if (movingTile != null) endMove()
         closeOverlay()
         (currentFocus as? Tile)?.key?.takeIf { it.isNotEmpty() }?.let { home.lastFocus = it }
@@ -357,6 +375,25 @@ class MainActivity : Activity() {
             typeface = C3Fonts.semibold(context)
             setTextColor(getColor(R.color.c3_text))
         }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        // Weather (Coesfeld), left of the clock; hidden until a value is known.
+        weatherIcon = ImageView(context).apply {
+            imageTintList = context.getColorStateList(R.color.c3_text_secondary)
+        }
+        weatherText = TextView(context).apply {
+            textSize = 17f
+            typeface = C3Fonts.medium(context)
+            setTextColor(getColor(R.color.c3_text_secondary))
+        }
+        weatherView = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            visibility = View.GONE
+            addView(weatherIcon, LinearLayout.LayoutParams(dp(17), dp(17)).apply { marginEnd = dp(5) })
+            addView(weatherText)
+        }
+        addView(weatherView, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
+        ).apply { marginEnd = dp(16) })
         addView(TextClock(context).apply {
             format24Hour = "HH:mm"
             format12Hour = "HH:mm"
@@ -730,6 +767,23 @@ class MainActivity : Activity() {
         applyApps(computeModel())
         toast(if (count == 1) "1 App wieder eingeblendet" else "$count Apps wieder eingeblendet")
         if (currentFocus?.isShown != true) focusFirst()
+    }
+
+    // ---------------------------------------------------------------- weather
+
+    private fun loadWeather() {
+        Thread({
+            val now = weather.fetch() ?: return@Thread
+            mainHandler.post { if (!isDestroyed) showWeather(now) }
+        }, "c3-weather").start()
+    }
+
+    private fun showWeather(now: Weather.Now?) {
+        if (now == null) return // keep the last shown value (or nothing) on errors
+        weatherIcon.setImageResource(now.iconRes)
+        weatherText.text = now.text
+        weatherView.contentDescription = "Coesfeld: ${now.description}, ${now.text}"
+        weatherView.visibility = View.VISIBLE
     }
 
     // ---------------------------------------------------------------- Laufende Apps (MENU)

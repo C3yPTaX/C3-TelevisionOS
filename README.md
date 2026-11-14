@@ -12,6 +12,7 @@ Läuft als normale App auf Fire OS: keine Firmware-Änderung, kein Root, jederze
 | **Home-Taste** | führt zu C3, zweimal drücken führt zu Amazon |
 | **Privat** | Browser und eigene Seiten, nur sichtbar, solange im Updater eingeschaltet |
 | **An C3 TV senden** | Links vom iPhone per Kurzbefehl am TV öffnen (nur bei „Privat an“) |
+| **Wetter** | aktuelles Wetter in Coesfeld neben der Uhr (Open-Meteo, ohne Konto) |
 | **Systemleiste** | Einstellungen, Netzwerk, Bluetooth, Geräteinfo, Fire TV |
 
 Auf dem Homescreen öffnet die **Menü-Taste ☰** „Laufende Apps“: OK schließt eine App,

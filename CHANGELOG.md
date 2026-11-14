@@ -2,6 +2,11 @@
 
 Version: Datei `VERSION` (x.y.z).
 
+## 0.9.0
+
+- TV: aktuelles Wetter für Coesfeld oben links neben der Uhr (Symbol + Temperatur),
+  aktualisiert alle 15 Minuten, solange der Homescreen sichtbar ist (Quelle: Open-Meteo).
+
 ## 0.8.1
 
 - TV: „Laufende Apps“ bleibt nach dem Loslassen der Menü-Taste offen.
