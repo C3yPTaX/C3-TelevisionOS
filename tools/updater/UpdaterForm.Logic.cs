@@ -249,6 +249,11 @@ namespace C3
                 return;
             }
 
+            // "Laufende Apps" (Menü-Taste) braucht den Nutzungszugriff; auf Fire TV nur per adb.
+            // Rückweg: adb shell appops set de.c3.tv GET_USAGE_STATS default
+            Adb("-s " + serial + " shell appops set " + PackageName + " GET_USAGE_STATS allow", 15000);
+            Log("Nutzungszugriff für „Laufende Apps“ erteilt.");
+
             Adb("-s " + serial + " shell am start -n " + MainActivity, 20000);
             if (pcs.Count > 0) PushPcs(serial);
             string now = InstalledVersion(serial);

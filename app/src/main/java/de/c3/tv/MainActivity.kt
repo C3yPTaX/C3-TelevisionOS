@@ -33,7 +33,9 @@ import de.c3.tv.core.Tile
 import de.c3.tv.core.TvInputs
 import de.c3.tv.core.WebStore
 import de.c3.tv.core.dp
+import de.c3.tv.core.RecentApps
 import de.c3.tv.feature.diagnostics.DiagnosticsActivity
+import de.c3.tv.feature.tasks.TaskPanel
 import de.c3.tv.feature.inputs.InputPlayerActivity
 import de.c3.tv.redirect.HomeRedirectService
 import de.c3.tv.remote.LinkReceiver
@@ -48,6 +50,7 @@ import java.util.concurrent.Executors
  *
  * Rows: Favoriten (own order, catalog apps that are missing at the end), Geräte, Web, Privat.
  * Long press OK on an app opens its options (move, hide, show hidden again).
+ * MENU opens "Laufende Apps" (close recently used apps; diagnostics from there).
  */
 class MainActivity : Activity() {
 
@@ -93,8 +96,11 @@ class MainActivity : Activity() {
 
     private lateinit var content: View
     private lateinit var dock: View
-    private var options: OptionsPanel? = null
-    private var optionsAnchor: Tile? = null
+    private lateinit var recentApps: RecentApps
+    /** Options panel or "Laufende Apps" over the home screen; focus behind it is blocked. */
+    private var overlay: View? = null
+    /** Gets the focus back when the overlay closes (tile or system bar button). */
+    private var optionsAnchor: View? = null
     private var movingTile: Tile? = null
 
     /** Focus to restore after a restart; dropped as soon as the user navigates. */
@@ -130,6 +136,7 @@ class MainActivity : Activity() {
         pcStore = PcStore(this)
         pcStatus = PcStatus(this) { states -> onPcStates(states) }
         webStore = WebStore(this)
+        recentApps = RecentApps(this)
         setContentView(buildLayout())
         handleConfigIntent(intent)
         pendingFocusKey = home.lastFocus
@@ -180,7 +187,7 @@ class MainActivity : Activity() {
         super.onStop()
         started = false
         if (movingTile != null) endMove()
-        closeOptions()
+        closeOverlay()
         (currentFocus as? Tile)?.key?.takeIf { it.isNotEmpty() }?.let { home.lastFocus = it }
         pcStatus.stop()
         io?.shutdownNow()
@@ -201,16 +208,16 @@ class MainActivity : Activity() {
             }
             return true // keep the tile in place while moving; volume etc. pass through
         }
-        if (options != null && (code == KeyEvent.KEYCODE_BACK || code == KeyEvent.KEYCODE_ESCAPE || code == KeyEvent.KEYCODE_MENU)) {
-            if (event.action == KeyEvent.ACTION_UP) closeOptions()
+        if (overlay != null && (code == KeyEvent.KEYCODE_BACK || code == KeyEvent.KEYCODE_ESCAPE || code == KeyEvent.KEYCODE_MENU)) {
+            if (event.action == KeyEvent.ACTION_UP) closeOverlay()
             return true
         }
         return super.dispatchKeyEvent(event)
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
-        if (keyCode == KeyEvent.KEYCODE_MENU) {
-            startActivity(Intent(this, DiagnosticsActivity::class.java))
+        if (keyCode == KeyEvent.KEYCODE_MENU && event.repeatCount == 0) {
+            showTasks()
             return true
         }
         return super.onKeyDown(keyCode, event)
@@ -623,7 +630,7 @@ class MainActivity : Activity() {
     // ---------------------------------------------------------------- options & moving
 
     private fun showOptions(tile: Tile) {
-        if (options != null || movingTile != null) return
+        if (overlay != null || movingTile != null) return
         val key = tile.key
         val pkg = key.takeIf { it.startsWith("app:") }?.removePrefix("app:")
         val title = tile.shelfTitle
@@ -638,19 +645,23 @@ class MainActivity : Activity() {
         }
         val hiddenCount = home.hidden().size
         if (hiddenCount > 0) items += "Ausgeblendete einblenden ($hiddenCount)" to { restoreHidden() }
-        val panel = OptionsPanel(this, title, items) { closeOptions() }
-        options = panel
+        val panel = OptionsPanel(this, title, items) { closeOverlay() }
         optionsAnchor = tile
+        showOverlay(panel, panel.firstButton)
+    }
+
+    private fun showOverlay(panel: View, focus: View) {
+        overlay = panel
         setBehindFocusable(false)
         (window.decorView as ViewGroup).addView(panel, ViewGroup.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT,
         ))
-        panel.firstButton.requestFocus()
+        focus.requestFocus()
     }
 
-    private fun closeOptions() {
-        val panel = options ?: return
-        options = null
+    private fun closeOverlay() {
+        val panel = overlay ?: return
+        overlay = null
         (window.decorView as ViewGroup).removeView(panel)
         setBehindFocusable(true)
         val anchor = optionsAnchor
@@ -713,6 +724,44 @@ class MainActivity : Activity() {
         applyApps(computeModel())
         toast(if (count == 1) "1 App wieder eingeblendet" else "$count Apps wieder eingeblendet")
         if (currentFocus?.isShown != true) focusFirst()
+    }
+
+    // ---------------------------------------------------------------- Laufende Apps (MENU)
+
+    private fun showTasks() {
+        if (overlay != null || movingTile != null) return
+        optionsAnchor = currentFocus
+        Thread({
+            val hasAccess = recentApps.hasUsageAccess()
+            val entries = recentApps.load(launcher, TASK_EXCLUDED)
+            entries.forEach { e ->
+                if (!artwork.containsKey(e.pkg)) {
+                    val art = launcher.loadArtwork(e.pkg)
+                    artwork[e.pkg] = Art(art, art?.drawable?.let { Glow.fromDrawable(it) })
+                }
+            }
+            mainHandler.post {
+                if (isDestroyed || !started || overlay != null) return@post
+                val panel = TaskPanel(
+                    this, entries, hasAccess,
+                    artwork = { pkg ->
+                        // Own copy: the same banner may be shown by a favourite tile at the same time.
+                        artwork[pkg]?.artwork?.let { a -> (a.drawable.constantState?.newDrawable() ?: a.drawable) to a.isBanner }
+                    },
+                    onCloseApp = { recentApps.close(it.pkg) },
+                    onCloseAll = { list ->
+                        list.forEach { recentApps.close(it.pkg) }
+                        closeOverlay()
+                        toast(if (list.size == 1) "1 App geschlossen" else "${list.size} Apps geschlossen")
+                    },
+                    onDiagnostics = {
+                        closeOverlay()
+                        startActivity(Intent(this, DiagnosticsActivity::class.java))
+                    },
+                )
+                showOverlay(panel, panel.firstFocus)
+            }
+        }, "c3-tasks").start()
     }
 
     // ---------------------------------------------------------------- state
@@ -894,6 +943,14 @@ class MainActivity : Activity() {
         private const val GLOW_FADE_MS = 320L
         private const val PLAYSTATION_BLUE = 0xFF2F6FE0.toInt()
         private const val KEY_RESTORE = "hidden"
+
+        /** System parts of Fire OS that are not "apps" in the task list. */
+        private val TASK_EXCLUDED = setOf(
+            "com.amazon.tv.launcher",
+            "com.amazon.tv.settings.v2",
+            "com.amazon.firehomestarter",
+            "com.amazon.tv.quicksettings.ui",
+        )
 
         private val MOVE_KEYS = setOf(
             KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN,

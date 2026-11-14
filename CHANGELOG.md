@@ -2,6 +2,13 @@
 
 Version: Datei `VERSION` (x.y.z).
 
+## 0.8.0
+
+- TV: Die **Menü-Taste ☰** öffnet „Laufende Apps“: zuletzt benutzte Apps mit Banner,
+  OK schließt eine App, dazu „Alle schließen“. Die Diagnose ist von dort erreichbar.
+- Updater: erteilt beim „TV aktualisieren“ den dafür nötigen Nutzungszugriff
+  (Rückweg: `adb shell appops set de.c3.tv GET_USAGE_STATS default`).
+
 ## 0.7.0
 
 - TV: Reihe **Favoriten** statt fester Apps. Nicht installierte Apps stehen blass am Ende.

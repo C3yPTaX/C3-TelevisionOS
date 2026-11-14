@@ -19,6 +19,13 @@ class AppLauncher(context: Context) {
         (pm.getLeanbackLaunchIntentForPackage(packageName) ?: pm.getLaunchIntentForPackage(packageName))
             ?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
+    /** Display name of an installed package, or null. Call off the main thread. */
+    fun label(packageName: String): String? = try {
+        pm.getApplicationInfo(packageName, 0).loadLabel(pm).toString().trim().ifEmpty { null }
+    } catch (e: PackageManager.NameNotFoundException) {
+        null
+    }
+
     /** TV banner of the app (activity banner, then app banner, then icon). Call off the main thread. */
     fun loadArtwork(packageName: String): Artwork? {
         val intent = launchIntent(packageName)

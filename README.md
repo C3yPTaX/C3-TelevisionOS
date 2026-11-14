@@ -14,7 +14,8 @@ Läuft als normale App auf Fire OS: keine Firmware-Änderung, kein Root, jederze
 | **An C3 TV senden** | Links vom iPhone per Kurzbefehl am TV öffnen (nur bei „Privat an“) |
 | **Systemleiste** | Einstellungen, Netzwerk, Bluetooth, Geräteinfo, Fire TV |
 
-Auf dem Homescreen öffnet die **Menü-Taste ☰** die Diagnose.
+Auf dem Homescreen öffnet die **Menü-Taste ☰** „Laufende Apps“: OK schließt eine App,
+dazu „Alle schließen“ und die Diagnose.
 **OK lang drücken** auf einer App öffnet ihre Optionen (Verschieben, Ausblenden, Ausgeblendete einblenden).
 
 ## Installation
@@ -43,7 +44,9 @@ Mit dem Haken **Entwicklerversion** nutzt er den Testkanal
 adb uninstall de.c3.tv
 ```
 
-Damit ist alles entfernt. Fire OS und der Amazon-Homescreen bleiben dabei unverändert.
+Damit ist alles entfernt, auch der Nutzungszugriff für „Laufende Apps“, den der Updater
+erteilt (einzeln zurücknehmen: `adb shell appops set de.c3.tv GET_USAGE_STATS default`).
+Fire OS und der Amazon-Homescreen bleiben dabei unverändert.
 
 ## Projekt
 
