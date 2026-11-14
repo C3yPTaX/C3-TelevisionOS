@@ -2,6 +2,7 @@ package de.c3.tv
 
 import android.app.Activity
 import android.content.Intent
+import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -22,6 +23,10 @@ import de.c3.tv.core.AppEntry
 import de.c3.tv.core.AppLauncher
 import de.c3.tv.core.C3Fonts
 import de.c3.tv.core.DockButton
+import de.c3.tv.core.Glow
+import de.c3.tv.core.HomeLayout
+import de.c3.tv.core.OptionsPanel
+import de.c3.tv.core.PcStatus
 import de.c3.tv.core.PcStore
 import de.c3.tv.core.SystemShortcuts
 import de.c3.tv.core.Tile
@@ -32,28 +37,35 @@ import de.c3.tv.feature.diagnostics.DiagnosticsActivity
 import de.c3.tv.feature.inputs.InputPlayerActivity
 import de.c3.tv.redirect.HomeRedirectService
 import de.c3.tv.remote.LinkReceiver
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
 /**
  * C3 Television OS home screen. Single activity, views built in code (design system:
  * docs/04-design-proposal.md), no background work except one short-lived thread that
- * loads app banners and TV inputs.
+ * loads apps, banners and TV inputs, and the PC status check while the screen is visible.
+ *
+ * Rows: Favoriten (own order, catalog apps that are missing at the end), Geräte, Web, Privat,
+ * Alle Apps (grid). Long press OK on an app opens its options (move, favourite, hide).
  */
 class MainActivity : Activity() {
 
     private lateinit var launcher: AppLauncher
     private lateinit var tvInputs: TvInputs
+    private lateinit var home: HomeLayout
     private val mainHandler = Handler(Looper.getMainLooper())
     private var io: ExecutorService? = null
 
-    private val appTiles = mutableListOf<Pair<AppEntry, Tile>>()
     private var playStationTile: Tile? = null
     private lateinit var pcStore: PcStore
+    private lateinit var pcStatus: PcStatus
     private val pcTiles = mutableListOf<Tile>()
+    private var pcStates: Map<String, PcStatus.State> = emptyMap()
     private var moonlightInstalled = true
     private var devicesRow: LinearLayout? = null
     private val hdmiTiles = mutableMapOf<String, Tile>()
+    private var started = false
 
     private lateinit var webStore: WebStore
     private var browserTile: Tile? = null
@@ -65,23 +77,68 @@ class MainActivity : Activity() {
     private lateinit var shelfCategory: TextView
     private lateinit var shelfTitle: TextView
 
+    // Apps: favourites row + "Alle Apps" grid, rebuilt only when the content changes.
+    private lateinit var rowsContainer: LinearLayout
+    private lateinit var favouritesRow: LinearLayout
+    private lateinit var allAppsTitle: View
+    private lateinit var allAppsGrid: LinearLayout
+    private var installedApps: List<AppLauncher.InstalledApp>? = null
+    private var catalogResolved: Map<String, String?> = emptyMap()
+    private var appsSignature = ""
+    private val artwork = ConcurrentHashMap<String, Art>()
+
+    // Light behind the title area (two layers, alpha cross-fade only).
+    private lateinit var glowFront: View
+    private lateinit var glowBack: View
+    private var glowColor: Int? = null
+
+    private lateinit var content: View
+    private lateinit var dock: View
+    private var options: OptionsPanel? = null
+    private var optionsAnchor: Tile? = null
+    private var movingTile: Tile? = null
+
+    /** Focus to restore after a restart; dropped as soon as the user navigates. */
+    private var pendingFocusKey: String? = null
+
     /** Updated off the main thread by [refresh]; read on the main thread only. */
     private var playStationInputId: String = TvInputs.PS5_FALLBACK_INPUT
+
+    private class Art(val artwork: AppLauncher.Artwork?, val glow: Int?)
+
+    private class AppsModel(
+        val favourites: List<HomeLayout.Favourite>,
+        val placeholders: List<AppEntry>,
+        val others: List<AppLauncher.InstalledApp>,
+        val hiddenCount: Int,
+        val seen: Set<String>,
+    ) {
+        val signature: String = buildString {
+            favourites.forEach { append(it.pkg).append('=').append(it.label).append(';') }
+            append('|')
+            placeholders.forEach { append(it.title).append(';') }
+            append('|')
+            others.forEach { append(it.pkg).append('=').append(it.label).append(';') }
+            append('|').append(hiddenCount)
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         launcher = AppLauncher(this)
         tvInputs = TvInputs(this)
+        home = HomeLayout(this)
         pcStore = PcStore(this)
+        pcStatus = PcStatus(this) { states -> onPcStates(states) }
         webStore = WebStore(this)
         setContentView(buildLayout())
         handleConfigIntent(intent)
+        pendingFocusKey = home.lastFocus
+        initFirstRun()
+        applyApps(computeModel())
         rebuildPcTiles()
         rebuildPrivateTiles()
-        appTiles.firstOrNull()?.second?.let { first ->
-            first.requestFocus()
-            showShelf(first.shelfCategory, first.shelfTitle)
-        }
+        if (!restorePendingFocus()) focusFirst()
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -90,6 +147,7 @@ class MainActivity : Activity() {
         if (handleConfigIntent(intent)) {
             rebuildPcTiles()
             rebuildPrivateTiles()
+            if (started) pcStatus.start(pcStore.load().map { it.uuid })
         }
     }
 
@@ -114,13 +172,41 @@ class MainActivity : Activity() {
 
     override fun onStart() {
         super.onStart()
+        started = true
         refresh()
+        pcStatus.start(pcStore.load().map { it.uuid })
     }
 
     override fun onStop() {
         super.onStop()
+        started = false
+        if (movingTile != null) endMove()
+        closeOptions()
+        (currentFocus as? Tile)?.key?.takeIf { it.isNotEmpty() }?.let { home.lastFocus = it }
+        pcStatus.stop()
         io?.shutdownNow()
         io = null
+    }
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        val code = event.keyCode
+        if (event.action == KeyEvent.ACTION_DOWN && code in NAV_KEYS) pendingFocusKey = null
+
+        val moving = movingTile
+        if (moving != null && code in MOVE_KEYS) {
+            if (event.action == KeyEvent.ACTION_DOWN) when (code) {
+                KeyEvent.KEYCODE_DPAD_LEFT -> moveFavourite(moving, -1)
+                KeyEvent.KEYCODE_DPAD_RIGHT -> moveFavourite(moving, +1)
+                KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN -> {}
+                else -> endMove()
+            }
+            return true // keep the tile in place while moving; volume etc. pass through
+        }
+        if (options != null && (code == KeyEvent.KEYCODE_BACK || code == KeyEvent.KEYCODE_ESCAPE || code == KeyEvent.KEYCODE_MENU)) {
+            if (event.action == KeyEvent.ACTION_UP) closeOptions()
+            return true
+        }
+        return super.dispatchKeyEvent(event)
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
@@ -145,6 +231,7 @@ class MainActivity : Activity() {
             clipToPadding = false
             setPadding(dp(40), dp(30), dp(40), dp(30))
         }
+        content = column
 
         column.addView(buildHeader())
         column.addView(buildShelf())
@@ -154,8 +241,9 @@ class MainActivity : Activity() {
             orientation = LinearLayout.VERTICAL
             clipChildren = false
             clipToPadding = false
-            setPadding(dp(12), 0, dp(12), dp(2))
+            setPadding(dp(12), 0, dp(12), dp(14))
         }
+        rowsContainer = rows
         // Rows must not paint over the title area or the dock when scrolled. A view's content is
         // only clipped to its bounds if its *parent* clips children – `column` does not (focus
         // scale), so the scroll view sits in its own clipping frame. Padding inside the rows
@@ -171,27 +259,22 @@ class MainActivity : Activity() {
             clipChildren = true
             addView(rowScroll, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
         }
-        // 960×540 dp: header + shelf + Apps/Geräte/Web fit without scrolling; ends above the dock.
+        // 960×540 dp: header + shelf + Favoriten/Geräte fit without scrolling; ends above the dock.
         column.addView(rowClip, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f).apply {
             leftMargin = -dp(12)
             rightMargin = -dp(12)
             bottomMargin = dp(44)
         })
 
-        rows.addView(sectionTitle("Apps"))
-        rows.addView(row(AppCatalog.streaming.map { entry ->
-            Tile(this, Tile.Style.APP).also { tile ->
-                tile.setTitle(entry.title)
-                tile.shelfCategory = "Streaming"
-                tile.shelfTitle = entry.title
-                tile.onFocused = { showShelf(it.shelfCategory, it.shelfTitle) }
-                tile.setOnClickListener { launchApp(entry) }
-                appTiles += entry to tile
-            }
-        }))
+        rows.addView(sectionTitle("Favoriten"))
+        val favs = row(emptyList())
+        favouritesRow = (favs as HorizontalScrollView).getChildAt(0) as LinearLayout
+        rows.addView(favs)
 
         rows.addView(sectionTitle("Geräte"))
         val ps = deviceTile("PlayStation 5", R.drawable.ic_gamepad, "Konsole · HDMI 2").apply {
+            key = "ps5"
+            glowColor = PLAYSTATION_BLUE
             setChip("HDMI 2", ok = true)
             setOnClickListener { onPlayStation() }
         }
@@ -204,6 +287,7 @@ class MainActivity : Activity() {
         webTitle = wTitle
         rows.addView(wTitle)
         val browser = deviceTile("Browser", R.drawable.ic_globe, "Web · Silk").apply {
+            key = "web"
             setChip("Silk", ok = false)
             setOnClickListener { launchApp(WebStore.silk, hint = "Silk Browser im Amazon Appstore installieren") }
         }
@@ -220,10 +304,25 @@ class MainActivity : Activity() {
         rows.addView(pTitle)
         rows.addView(pRow)
 
+        allAppsTitle = sectionTitle("Alle Apps").apply { visibility = View.GONE }
+        rows.addView(allAppsTitle)
+        allAppsGrid = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            clipChildren = false
+            clipToPadding = false
+        }
+        rows.addView(allAppsGrid)
+
+        glowFront = glowLayer()
+        glowBack = glowLayer()
+        dock = buildDock()
+
         return FrameLayout(this).apply {
             clipChildren = false
+            addView(glowBack, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+            addView(glowFront, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
             addView(column, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
-            addView(buildDock(), FrameLayout.LayoutParams(
+            addView(dock, FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT,
                 Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL,
@@ -299,6 +398,41 @@ class MainActivity : Activity() {
         }.start()
     }
 
+    private fun onTileFocused(tile: Tile) {
+        showShelf(tile.shelfCategory, tile.shelfTitle)
+        showGlow(tile.glowColor)
+    }
+
+    /** Full-screen radial light from the upper left; drawn without an offscreen layer. */
+    private fun glowLayer(): View = object : View(this) {
+        override fun hasOverlappingRendering() = false
+    }.apply {
+        alpha = 0f
+        isFocusable = false
+        background = GradientDrawable().apply {
+            gradientType = GradientDrawable.RADIAL_GRADIENT
+            gradientRadius = dp(620).toFloat()
+            setGradientCenter(0.2f, 0f)
+            colors = intArrayOf(0, 0)
+        }
+    }
+
+    private fun showGlow(color: Int?) {
+        if (color == glowColor) return
+        glowColor = color
+        val incoming = glowBack
+        val outgoing = glowFront
+        outgoing.animate().cancel()
+        incoming.animate().cancel()
+        outgoing.animate().alpha(0f).setDuration(GLOW_FADE_MS).start()
+        if (color != null) {
+            (incoming.background as GradientDrawable).colors = intArrayOf(color, color and 0x00FFFFFF)
+            incoming.animate().alpha(GLOW_ALPHA).setDuration(GLOW_FADE_MS).start()
+        }
+        glowFront = incoming
+        glowBack = outgoing
+    }
+
     private fun buildDock(): View = LinearLayout(this).apply {
         orientation = LinearLayout.HORIZONTAL
         clipChildren = false
@@ -308,7 +442,10 @@ class MainActivity : Activity() {
         setPadding(p, p, p, p)
         SystemShortcuts.all.forEach { sc ->
             addView(DockButton(context, sc.title, sc.iconRes).apply {
-                onFocused = { showShelf("System", sc.subtitle) }
+                onFocused = {
+                    showShelf("System", sc.subtitle)
+                    showGlow(null)
+                }
                 setOnClickListener {
                     if (sc.iconRes == R.drawable.ic_home) HomeRedirectService.requestEscape()
                     if (!launcher.start(sc.intent)) toast("${sc.title} ist auf diesem Gerät nicht erreichbar")
@@ -325,7 +462,7 @@ class MainActivity : Activity() {
             setIcon(iconRes)
             shelfCategory = category
             shelfTitle = name
-            onFocused = { showShelf(it.shelfCategory, it.shelfTitle) }
+            onFocused = { onTileFocused(it) }
         }
 
     private fun sectionTitle(text: String): View = TextView(this).apply {
@@ -355,6 +492,282 @@ class MainActivity : Activity() {
         }
     }
 
+    // ---------------------------------------------------------------- apps
+
+    /** First start: the installed catalog apps become the favourites (6 quick lookups, once). */
+    private fun initFirstRun() {
+        if (home.isInitialized) return
+        val favs = AppCatalog.streaming.mapNotNull { entry ->
+            launcher.resolve(entry)?.let { HomeLayout.Favourite(it, entry.title) }
+        }
+        home.saveFavourites(favs)
+        home.setSeenCatalog(AppCatalog.streaming.filter { launcher.resolve(it) != null }.map { it.title }.toSet())
+    }
+
+    /**
+     * Arrangement from the stored layout and the latest app list. Before the first [refresh]
+     * of this process ([installedApps] == null) only stored data is used, so the first frame
+     * needs no PackageManager call.
+     */
+    private fun computeModel(): AppsModel {
+        val hidden = home.hidden()
+        val seen = home.seenCatalog().toMutableSet()
+        val all = installedApps
+        val labels = all?.associate { it.pkg to it.label }.orEmpty()
+        val installedPkgs = labels.keys + catalogResolved.values.filterNotNull()
+
+        val favs = home.favourites()
+            .filter { all == null || it.pkg in installedPkgs }
+            .filter { appKey(it.pkg) !in hidden }
+            .map { HomeLayout.Favourite(it.pkg, labels[it.pkg] ?: it.label) }
+            .toMutableList()
+        if (all != null) {
+            AppCatalog.streaming.forEach { entry ->
+                val pkg = catalogResolved[entry.title] ?: return@forEach
+                if (!seen.add(entry.title)) return@forEach
+                if (favs.none { it.pkg == pkg } && appKey(pkg) !in hidden) {
+                    favs += HomeLayout.Favourite(pkg, labels[pkg] ?: entry.title)
+                }
+            }
+        }
+        val placeholders = AppCatalog.streaming.filter { entry ->
+            entry.title !in seen && (all == null || catalogResolved[entry.title] == null) &&
+                HomeLayout.catalogKey(entry) !in hidden
+        }
+        val favPkgs = favs.map { it.pkg }.toSet()
+        val others = all.orEmpty().filter { it.pkg !in favPkgs && appKey(it.pkg) !in hidden }
+        val hiddenCount = hidden.count { key ->
+            if (key.startsWith("cat:")) true else key.removePrefix("app:") in installedPkgs || all == null
+        }
+        return AppsModel(favs, placeholders, others, hiddenCount, seen)
+    }
+
+    private fun applyApps(model: AppsModel) {
+        home.saveFavourites(model.favourites)
+        home.setSeenCatalog(model.seen)
+        if (model.signature == appsSignature) return
+        appsSignature = model.signature
+
+        val focusedKey = (currentFocus as? Tile)?.key
+        val focusWasInApps = currentFocus?.let { isInApps(it) } == true
+
+        favouritesRow.removeAllViews()
+        model.favourites.forEach { fav ->
+            favouritesRow.addView(appTile(appKey(fav.pkg), fav.label, fav.pkg, "Favorit"))
+        }
+        model.placeholders.forEach { entry ->
+            favouritesRow.addView(appTile(HomeLayout.catalogKey(entry), entry.title, null, "Nicht installiert").apply {
+                setAvailable(false)
+                setOnClickListener { toast("${entry.title} ist nicht installiert – im Amazon Appstore installieren") }
+            })
+        }
+
+        allAppsGrid.removeAllViews()
+        val gridTiles = model.others.map { appTile(appKey(it.pkg), it.label, it.pkg, "Alle Apps") }.toMutableList()
+        if (model.hiddenCount > 0) {
+            gridTiles += Tile(this, Tile.Style.APP).apply {
+                key = KEY_RESTORE
+                setTitle("Ausgeblendete einblenden (${model.hiddenCount})")
+                shelfCategory = "Alle Apps"
+                shelfTitle = "Ausgeblendete Apps"
+                onFocused = { onTileFocused(it) }
+                setOnClickListener { restoreHidden() }
+            }
+        }
+        gridTiles.chunked(GRID_COLUMNS).forEach { line ->
+            allAppsGrid.addView(LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                clipChildren = false
+                clipToPadding = false
+                val v = dp(6)
+                setPadding(0, v, 0, v)
+                line.forEachIndexed { i, tile ->
+                    if (i == line.lastIndex) (tile.layoutParams as LinearLayout.LayoutParams).marginEnd = 0
+                    addView(tile)
+                }
+            })
+        }
+        allAppsTitle.visibility = if (gridTiles.isEmpty()) View.GONE else View.VISIBLE
+
+        when {
+            restorePendingFocus() -> {}
+            focusedKey != null && findTile(focusedKey)?.requestFocus() == true -> {}
+            focusWasInApps || currentFocus == null || currentFocus?.isShown != true -> focusFirst()
+        }
+    }
+
+    private fun appTile(key: String, title: String, pkg: String?, category: String): Tile =
+        Tile(this, Tile.Style.APP).apply {
+            this.key = key
+            setTitle(title)
+            shelfCategory = category
+            shelfTitle = title
+            onFocused = { onTileFocused(it) }
+            if (pkg != null) {
+                artwork[pkg]?.let { applyArt(this, it) }
+                setOnClickListener { launchPackage(pkg, title) }
+            }
+            setOnLongClickListener {
+                showOptions(this)
+                true
+            }
+        }
+
+    private fun applyArt(tile: Tile, art: Art) {
+        tile.setArtwork(art.artwork?.drawable, art.artwork?.isBanner == true)
+        tile.glowColor = art.glow
+        if (tile.isFocused) showGlow(art.glow)
+    }
+
+    private fun isInApps(view: View): Boolean {
+        var v: View? = view
+        while (v != null) {
+            if (v === favouritesRow || v === allAppsGrid) return true
+            v = v.parent as? View
+        }
+        return false
+    }
+
+    private fun findTile(key: String): Tile? {
+        fun search(group: ViewGroup): Tile? {
+            for (i in 0 until group.childCount) {
+                val child = group.getChildAt(i)
+                if (child is Tile && child.key == key) return child
+                if (child is ViewGroup && child !is Tile) search(child)?.let { return it }
+            }
+            return null
+        }
+        return search(rowsContainer)
+    }
+
+    private fun restorePendingFocus(): Boolean {
+        val key = pendingFocusKey ?: return false
+        val tile = findTile(key) ?: return false
+        if (!tile.isShown || !tile.requestFocus()) return false
+        pendingFocusKey = null
+        return true
+    }
+
+    private fun focusFirst() {
+        val first = (0 until favouritesRow.childCount).map { favouritesRow.getChildAt(it) }.firstOrNull()
+            ?: playStationTile
+        first?.requestFocus()
+    }
+
+    // ---------------------------------------------------------------- options & moving
+
+    private fun showOptions(tile: Tile) {
+        if (options != null || movingTile != null) return
+        val key = tile.key
+        val pkg = key.takeIf { it.startsWith("app:") }?.removePrefix("app:")
+        val inFavourites = tile.parent === favouritesRow
+        val title = tile.shelfTitle
+        val items = mutableListOf<Pair<String, () -> Unit>>()
+        when {
+            pkg != null && inFavourites -> {
+                items += "Verschieben" to { startMove(tile) }
+                items += "Aus Favoriten entfernen" to { removeFavourite(pkg) }
+                items += "Ausblenden" to { hide(key) }
+            }
+            pkg != null -> {
+                items += "Zu Favoriten hinzufügen" to { addFavourite(pkg, title) }
+                items += "Ausblenden" to { hide(key) }
+            }
+            key.startsWith("cat:") -> items += "Ausblenden" to { hide(key) }
+            else -> return
+        }
+        val panel = OptionsPanel(this, title, items) { closeOptions() }
+        options = panel
+        optionsAnchor = tile
+        setBehindFocusable(false)
+        (window.decorView as ViewGroup).addView(panel, ViewGroup.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT,
+        ))
+        panel.firstButton.requestFocus()
+    }
+
+    private fun closeOptions() {
+        val panel = options ?: return
+        options = null
+        (window.decorView as ViewGroup).removeView(panel)
+        setBehindFocusable(true)
+        val anchor = optionsAnchor
+        optionsAnchor = null
+        if (anchor != null && anchor.isAttachedToWindow) anchor.requestFocus()
+    }
+
+    private fun setBehindFocusable(focusable: Boolean) {
+        val mode = if (focusable) ViewGroup.FOCUS_AFTER_DESCENDANTS else ViewGroup.FOCUS_BLOCK_DESCENDANTS
+        (content as ViewGroup).descendantFocusability = mode
+        (dock as ViewGroup).descendantFocusability = mode
+    }
+
+    private fun startMove(tile: Tile) {
+        if (!tile.isAttachedToWindow) return
+        movingTile = tile
+        tile.setMoving(true)
+        tile.requestFocus()
+        showShelf("Verschieben · ◀ ▶, OK zum Beenden", tile.shelfTitle)
+    }
+
+    private fun moveFavourite(tile: Tile, direction: Int) {
+        val index = favouritesRow.indexOfChild(tile)
+        val favCount = (0 until favouritesRow.childCount).count {
+            (favouritesRow.getChildAt(it) as? Tile)?.key?.startsWith("app:") == true
+        }
+        val target = index + direction
+        if (index < 0 || target < 0 || target >= favCount) return
+        favouritesRow.removeViewAt(index)
+        favouritesRow.addView(tile, target)
+        tile.requestFocus()
+    }
+
+    private fun endMove() {
+        val tile = movingTile ?: return
+        movingTile = null
+        tile.setMoving(false)
+        val order = (0 until favouritesRow.childCount)
+            .mapNotNull { (favouritesRow.getChildAt(it) as? Tile)?.key?.takeIf { k -> k.startsWith("app:") } }
+            .map { it.removePrefix("app:") }
+        val byPkg = home.favourites().associateBy { it.pkg }
+        home.saveFavourites(order.mapNotNull { byPkg[it] })
+        // The row already shows the new order: only remember it, no rebuild.
+        appsSignature = computeModel().signature
+        if (tile.isFocused) onTileFocused(tile)
+    }
+
+    private fun addFavourite(pkg: String, label: String) {
+        home.saveFavourites(home.favourites() + HomeLayout.Favourite(pkg, label))
+        pendingFocusKey = appKey(pkg)
+        applyApps(computeModel())
+        toast("$label ist jetzt ein Favorit")
+    }
+
+    private fun removeFavourite(pkg: String) {
+        home.saveFavourites(home.favourites().filter { it.pkg != pkg })
+        // Keep the focus in the favourites row instead of jumping into the grid.
+        val row = favouritesRow
+        val index = (0 until row.childCount).firstOrNull { (row.getChildAt(it) as? Tile)?.key == appKey(pkg) } ?: 0
+        applyApps(computeModel())
+        row.getChildAt(index.coerceAtMost(row.childCount - 1))?.requestFocus()
+    }
+
+    private fun hide(key: String) {
+        home.setHidden(home.hidden() + key)
+        if (key.startsWith("app:")) home.saveFavourites(home.favourites().filter { appKey(it.pkg) != key })
+        applyApps(computeModel())
+        if (currentFocus?.isShown != true) focusFirst()
+        toast("Ausgeblendet – unter „Alle Apps“ wieder einblendbar")
+    }
+
+    private fun restoreHidden() {
+        val count = home.hidden().size
+        home.setHidden(emptySet())
+        applyApps(computeModel())
+        toast(if (count == 1) "1 App wieder eingeblendet" else "$count Apps wieder eingeblendet")
+        if (currentFocus?.isShown != true) focusFirst()
+    }
+
     // ---------------------------------------------------------------- state
 
     /**
@@ -363,8 +776,11 @@ class MainActivity : Activity() {
      */
     private fun refresh() {
         val executor = Executors.newSingleThreadExecutor().also { io = it }
+        val exclude = EXCLUDED_PACKAGES + packageName
+        val hidden = home.hidden()
         executor.execute {
-            val apps = appTiles.map { (entry, tile) -> tile to launcher.resolve(entry) }
+            val catalog = AppCatalog.streaming.associate { it.title to launcher.resolve(it) }
+            val apps = launcher.installedApps(exclude)
             val moonlightInstalled = launcher.resolve(AppCatalog.moonlight) != null
             val silkAvailable = launcher.resolve(WebStore.silk) != null
             val inputs = tvInputs.list()
@@ -374,22 +790,26 @@ class MainActivity : Activity() {
 
             mainHandler.post {
                 if (isDestroyed) return@post
-                apps.forEach { (tile, pkg) ->
-                tile.setAvailable(pkg != null)
-                tile.shelfCategory = if (pkg != null) "Streaming" else "Nicht installiert"
-                if (tile.isFocused) showShelf(tile.shelfCategory, tile.shelfTitle)
-            }
+                installedApps = apps
+                catalogResolved = catalog
+                applyApps(computeModel())
                 this.moonlightInstalled = moonlightInstalled
                 browserTile?.setAvailable(silkAvailable)
                 pcTiles.forEach { it.setAvailable(moonlightInstalled) }
                 playStationInputId = ps?.id ?: TvInputs.PS5_FALLBACK_INPUT
                 otherPorts.forEach { addHdmiTile(it) }
+                restorePendingFocus()
             }
 
-            apps.forEach { (tile, pkg) ->
+            // Banners: favourites first, hidden apps skipped, each package loaded once per process.
+            val order = (catalog.values.filterNotNull() + apps.map { it.pkg }).distinct()
+                .filter { appKey(it) !in hidden && !artwork.containsKey(it) }
+            for (pkg in order) {
                 if (Thread.currentThread().isInterrupted) return@execute
-                val art = pkg?.let { launcher.loadArtwork(it) }
-                mainHandler.post { tile.setArtwork(art?.drawable, art?.isBanner == true) }
+                val art = launcher.loadArtwork(pkg)
+                val entry = Art(art, art?.drawable?.let { Glow.fromDrawable(it) })
+                artwork[pkg] = entry
+                mainHandler.post { if (!isDestroyed) findTile(appKey(pkg))?.let { applyArt(it, entry) } }
             }
         }
         executor.shutdown()
@@ -404,12 +824,16 @@ class MainActivity : Activity() {
         val pcs = pcStore.load()
         if (pcs.isEmpty()) {
             pcTiles += deviceTile("PC streamen", R.drawable.ic_monitor, "C3 Desktop").apply {
+                key = "pc:moonlight"
+                glowColor = getColor(R.color.c3_accent)
                 setChip("Moonlight", ok = false)
                 setOnClickListener { launchApp(AppCatalog.moonlight, hint = "Moonlight aus dem Amazon Appstore installieren") }
             }
         } else {
             pcs.forEach { pc ->
                 pcTiles += deviceTile(pc.name, R.drawable.ic_monitor, "C3 Desktop · ${pc.appName}").apply {
+                    key = "pc:" + pc.uuid.lowercase()
+                    glowColor = getColor(R.color.c3_accent)
                     setChip(pc.appName, ok = false)
                     setOnClickListener {
                         if (!launcher.start(PcStore.streamIntent(pc))) {
@@ -422,6 +846,31 @@ class MainActivity : Activity() {
         pcTiles.forEachIndexed { i, tile ->
             tile.setAvailable(moonlightInstalled)
             row.addView(tile, 1 + i)
+        }
+        applyPcStates()
+        restorePendingFocus()
+    }
+
+    private fun onPcStates(states: Map<String, PcStatus.State>) {
+        pcStates = states
+        applyPcStates()
+    }
+
+    /** Status capsule + title-area text of the PC tiles (Online / Belegt / Offline). */
+    private fun applyPcStates() {
+        val pcs = pcStore.load().associateBy { "pc:" + it.uuid.lowercase() }
+        pcTiles.forEach { tile ->
+            val pc = pcs[tile.key] ?: return@forEach
+            val state = pcStates[pc.uuid.lowercase()]
+            val label = when (state) {
+                PcStatus.State.ONLINE -> "Online"
+                PcStatus.State.BUSY -> "Belegt"
+                PcStatus.State.OFFLINE -> "Offline"
+                null -> null
+            }
+            tile.setChip(label ?: pc.appName, ok = state == PcStatus.State.ONLINE)
+            tile.shelfCategory = "C3 Desktop · " + (label ?: pc.appName)
+            if (tile.isFocused) showShelf(tile.shelfCategory, tile.shelfTitle)
         }
     }
 
@@ -440,12 +889,14 @@ class MainActivity : Activity() {
         val visible = if (sites.isEmpty()) View.GONE else View.VISIBLE
         privateTitle?.visibility = visible
         privateScroll?.visibility = visible
-        if (hadFocus && currentFocus?.isShown != true) appTiles.firstOrNull()?.second?.requestFocus()
+        if (hadFocus && currentFocus?.isShown != true) focusFirst()
         sites.forEach { site ->
             row.addView(deviceTile(site.name, R.drawable.ic_globe, "Privat").apply {
+                key = "site:" + site.url
                 setOnClickListener { openUrl(site.url) }
             })
         }
+        restorePendingFocus()
     }
 
     private fun openUrl(url: String) {
@@ -458,6 +909,7 @@ class MainActivity : Activity() {
         if (hdmiTiles.containsKey(input.id)) return
         val label = input.label.ifEmpty { "HDMI" }
         val tile = deviceTile(label, R.drawable.ic_hdmi, "Eingang").apply {
+            key = "hdmi:" + input.id
             setOnClickListener { startActivity(InputPlayerActivity.intent(this@MainActivity, input.id, label)) }
         }
         hdmiTiles[input.id] = tile
@@ -474,6 +926,13 @@ class MainActivity : Activity() {
         }
     }
 
+    private fun launchPackage(pkg: String, title: String) {
+        val intent = launcher.launchIntent(pkg)
+        if (intent == null || !launcher.start(intent)) {
+            toast("$title lässt sich nicht starten – im Amazon Appstore prüfen")
+        }
+    }
+
     /**
      * Amazon's input switcher is signature-protected (TUNE_INPUT / LAUNCH_INPUTS), so C3
      * shows the PS5 itself via TvView. HDMI-CEC One Touch Play keeps working independently.
@@ -484,4 +943,34 @@ class MainActivity : Activity() {
 
     private fun toast(message: String) = Toast.makeText(this, message, Toast.LENGTH_LONG).show()
 
+    companion object {
+        private const val GRID_COLUMNS = 6
+        private const val GLOW_ALPHA = 0.32f
+        private const val GLOW_FADE_MS = 320L
+        private const val PLAYSTATION_BLUE = 0xFF2F6FE0.toInt()
+        private const val KEY_RESTORE = "hidden"
+
+        /** Shown elsewhere (dock, Web row) or not meant to be started from C3. */
+        private val EXCLUDED_PACKAGES = setOf(
+            "com.amazon.tv.launcher",
+            "com.amazon.tv.settings.v2",
+            "com.amazon.firehomestarter",
+            "com.amazon.servicemenu",
+            WebStore.SILK_PACKAGE,
+        )
+
+        private val MOVE_KEYS = setOf(
+            KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN,
+            KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT,
+            KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER,
+            KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_ESCAPE, KeyEvent.KEYCODE_MENU,
+        )
+
+        private val NAV_KEYS = setOf(
+            KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN,
+            KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT,
+        )
+
+        private fun appKey(pkg: String) = "app:$pkg"
+    }
 }

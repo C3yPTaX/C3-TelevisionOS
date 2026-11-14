@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Options panel: same glass as the system bar, rounded rectangle. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape>
+            <gradient android:angle="270" android:endColor="#F014161C" android:startColor="#F2262A33" />
+            <corners android:radius="22dp" />
+        </shape>
+    </item>
+    <item>
+        <shape>
+            <stroke android:width="0.5dp" android:color="@color/c3_glass_edge" />
+            <corners android:radius="22dp" />
+        </shape>
+    </item>
+</layer-list>

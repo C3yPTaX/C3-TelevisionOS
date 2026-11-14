@@ -2,6 +2,15 @@
 
 Version: Datei `VERSION` (x.y.z).
 
+## 0.7.0
+
+- TV: Reihe **Favoriten** statt fester Apps. Nicht installierte Apps stehen blass am Ende.
+- TV: **Alle Apps** als Raster (alphabetisch). Langer Druck auf OK öffnet die Optionen:
+  Verschieben, zu Favoriten hinzufügen oder entfernen, Ausblenden.
+- TV: sanfter Farbschein oben in der Farbe der fokussierten App.
+- TV: C3 merkt sich die zuletzt gewählte Kachel.
+- TV: PC-Kacheln zeigen **Online**, **Belegt** oder **Offline** (Sunshine im Heimnetz).
+
 ## 0.6.7
 
 - Projektregeln (`AGENTS.md`): pauschale Verbote (Root, Firmware, Systemeingriffe) durch

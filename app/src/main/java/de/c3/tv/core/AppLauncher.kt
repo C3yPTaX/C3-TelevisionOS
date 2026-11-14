@@ -19,6 +19,33 @@ class AppLauncher(context: Context) {
         (pm.getLeanbackLaunchIntentForPackage(packageName) ?: pm.getLaunchIntentForPackage(packageName))
             ?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
+    /** Display name of an installed package, or null. Call off the main thread. */
+    fun label(packageName: String): String? = try {
+        pm.getApplicationInfo(packageName, 0).loadLabel(pm).toString().trim().ifEmpty { null }
+    } catch (e: PackageManager.NameNotFoundException) {
+        null
+    }
+
+    /**
+     * All launchable apps (TV launcher entries first, then phone launcher entries), one per package,
+     * without [exclude]. Needs the MAIN/LEANBACK_LAUNCHER and MAIN/LAUNCHER `<queries>` entries.
+     * Call off the main thread.
+     */
+    fun installedApps(exclude: Set<String>): List<InstalledApp> {
+        val seen = HashSet<String>(exclude)
+        val result = ArrayList<InstalledApp>()
+        for (category in listOf(Intent.CATEGORY_LEANBACK_LAUNCHER, Intent.CATEGORY_LAUNCHER)) {
+            val query = Intent(Intent.ACTION_MAIN).addCategory(category)
+            for (info in pm.queryIntentActivities(query, 0)) {
+                val pkg = info.activityInfo?.packageName ?: continue
+                if (!seen.add(pkg)) continue
+                val label = info.loadLabel(pm)?.toString()?.trim().orEmpty().ifEmpty { pkg }
+                result += InstalledApp(pkg, label)
+            }
+        }
+        return result.sortedBy { it.label.lowercase() }
+    }
+
     /** TV banner of the app (activity banner, then app banner, then icon). Call off the main thread. */
     fun loadArtwork(packageName: String): Artwork? {
         val intent = launchIntent(packageName)
@@ -45,4 +72,6 @@ class AppLauncher(context: Context) {
     }
 
     data class Artwork(val drawable: Drawable, val isBanner: Boolean)
+
+    data class InstalledApp(val pkg: String, val label: String)
 }
