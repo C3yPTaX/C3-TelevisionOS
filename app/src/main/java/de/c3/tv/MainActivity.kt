@@ -57,6 +57,8 @@ class MainActivity : Activity() {
 
     private lateinit var webStore: WebStore
     private var browserTile: Tile? = null
+    private var webTitle: View? = null
+    private var webScroll: View? = null
     private var privateTitle: View? = null
     private var privateRow: LinearLayout? = null
     private var privateScroll: View? = null
@@ -198,13 +200,17 @@ class MainActivity : Activity() {
         devicesRow = (devices as HorizontalScrollView).getChildAt(0) as LinearLayout
         rows.addView(devices)
 
-        rows.addView(sectionTitle("Web"))
+        val wTitle = sectionTitle("Web")
+        webTitle = wTitle
+        rows.addView(wTitle)
         val browser = deviceTile("Browser", R.drawable.ic_globe, "Web · Silk").apply {
             setChip("Silk", ok = false)
             setOnClickListener { launchApp(WebStore.silk, hint = "Silk Browser im Amazon Appstore installieren") }
         }
         browserTile = browser
-        rows.addView(row(listOf(browser)))
+        val wRow = row(listOf(browser))
+        webScroll = wRow
+        rows.addView(wRow)
 
         val pTitle = sectionTitle("Privat")
         val pRow = row(emptyList())
@@ -419,14 +425,22 @@ class MainActivity : Activity() {
         }
     }
 
-    /** Private row exists only while the area is switched on in the C3 Updater. */
+    /**
+     * Web row (browser tile) and private row exist only while the private area is switched on
+     * in the C3 Updater; "Privat aus" removes both from the home screen.
+     */
     private fun rebuildPrivateTiles() {
         val row = privateRow ?: return
+        val hadFocus = browserTile?.isFocused == true || row.hasFocus()
         row.removeAllViews()
+        val webVisible = if (webStore.isPrivateEnabled()) View.VISIBLE else View.GONE
+        webTitle?.visibility = webVisible
+        webScroll?.visibility = webVisible
         val sites = webStore.privateSites()
         val visible = if (sites.isEmpty()) View.GONE else View.VISIBLE
         privateTitle?.visibility = visible
         privateScroll?.visibility = visible
+        if (hadFocus && currentFocus?.isShown != true) appTiles.firstOrNull()?.second?.requestFocus()
         sites.forEach { site ->
             row.addView(deviceTile(site.name, R.drawable.ic_globe, "Privat").apply {
                 setOnClickListener { openUrl(site.url) }

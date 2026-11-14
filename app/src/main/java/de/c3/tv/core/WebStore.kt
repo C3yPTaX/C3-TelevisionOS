@@ -19,6 +19,9 @@ class WebStore(context: Context) {
 
     private val prefs = context.getSharedPreferences("c3_private", Context.MODE_PRIVATE)
 
+    /** True while the private area is switched on in the C3 Updater (also shows the browser tile). */
+    fun isPrivateEnabled(): Boolean = prefs.getBoolean(KEY_ENABLED, false)
+
     fun privateSites(): List<Site> =
         if (prefs.getBoolean(KEY_ENABLED, false)) parse(prefs.getString(KEY_SITES, "").orEmpty()) else emptyList()
 

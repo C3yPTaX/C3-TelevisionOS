@@ -2,6 +2,11 @@
 
 Nur die wesentlichen Änderungen. Version: Datei `VERSION` (x.y.z).
 
+## 0.6.3
+
+- TV: Die Reihe „Web“ mit der Browser-Kachel erscheint nur noch, solange „Privat“ an ist.
+  „Privat aus“ entfernt sie zusammen mit der Privat-Reihe vom Homescreen.
+
 ## 0.6.2
 
 - TV: Beim Wechsel in untere Reihen (Geräte, Web) schoben sich die Reihen über den großen

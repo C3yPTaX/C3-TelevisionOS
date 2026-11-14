@@ -137,7 +137,7 @@ namespace C3
 
             Adb("-s " + serial + " shell am start -n " + MainActivity +
                 " -a de.c3.tv.action.SET_PRIVATE --ez de.c3.tv.extra.ENABLED false", 20000);
-            Log("Privat-Reihe auf dem TV entfernt.");
+            Log("Web- und Privat-Reihe auf dem TV entfernt.");
             if (installed)
             {
                 Log("Silk-Daten löschen: " + Adb("-s " + serial + " shell pm clear " + SilkPackage, 20000).Trim());
