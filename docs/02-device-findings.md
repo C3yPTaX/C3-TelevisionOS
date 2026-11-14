@@ -79,8 +79,16 @@ Updater-Karte „Amazon entrümpeln“: `pm disable-user --user 0` für eine kur
 Quellen: Community-Listen für Fire-TV-Sticks/Cube (JLCareglio-Gist, dumbtv.org, XDA Cube 3,
 cleanyourtv). Bewusst **nicht** abgeschaltet: Launcher (Home-Umleitung), Einstellungen,
 Appstore, Tastatur, HDMI/Eingänge, Fernbedienung, WebView, OTA, Uhrzeit, Prime Video, Netflix,
-Silk sowie `com.amazon.imp` (zerstörte laut Quelle Home). Ergebnis am Gerät (welche Pakete
-Fire OS 8.1.8.5 sperrt, Speichergewinn) hier nachtragen.
+Silk sowie `com.amazon.imp` (zerstörte laut Quelle Home).
+
+**Ergebnis am Gerät (2026-11-14, Fire OS 8.1.8.5):** 22 von 28 abgeschaltet ✅.
+Von Amazon geschützt (`SecurityException: Cannot disable a protected package`):
+`com.amazon.device.crashmanager`, `com.amazon.ftvads.deeplinking`. Nicht vorhanden:
+`com.amazon.shoptv.firetv.client`, `com.amazon.device.sale.service`,
+`com.amazon.imdb.tv.android.app`, `com.amazon.communication.discovery`.
+Arbeitsspeicher frei 553 → 549 MB direkt danach: **kein messbarer Gewinn** – die Pakete liefen
+kaum dauerhaft. Nutzen: weniger Hintergrund-/Netzverkehr, ACR aus. Für spürbar mehr Tempo
+müssen die echten Verbraucher bekannt sein (ab 0.10.1 im Protokoll).
 
 ## 5. Streaming-Apps
 

@@ -2,6 +2,11 @@
 
 Version: Datei `VERSION` (x.y.z).
 
+## 0.10.1
+
+- Updater: „Entrümpeln“ zeigt danach die 15 größten Speicherverbraucher am TV, misst den
+  Speicher erst nach einer kurzen Pause und meldet von Amazon geschützte Pakete in einer Zeile.
+
 ## 0.10.0
 
 - Updater: Karte **Amazon entrümpeln** schaltet Werbung, Datensammlung (u. a. Inhaltserkennung)

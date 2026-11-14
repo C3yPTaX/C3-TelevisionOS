@@ -13,6 +13,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Windows.Forms;
 
 namespace C3
@@ -117,7 +118,7 @@ namespace C3
             int before = MemAvailableMb(serial);
             Log("Arbeitsspeicher frei vorher: " + before + " MB");
 
-            int done = 0, already = 0, missing = 0, failed = 0;
+            int done = 0, already = 0, missing = 0, failed = 0, isProtected = 0;
             foreach (string[] p in DebloatSelection(extended))
             {
                 string pkg = p[0];
@@ -130,20 +131,29 @@ namespace C3
                     done++;
                     Log("✓  " + pkg + "  – " + p[1]);
                 }
+                else if (r.IndexOf("protected package", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    isProtected++;
+                    Log("○  " + pkg + "  – von Amazon geschützt, bleibt an");
+                }
                 else
                 {
                     failed++;
-                    Log("✗  " + pkg + "  – vom System gesperrt: " + r);
+                    Log("✗  " + pkg + "  – " + FirstLine(r));
                 }
             }
 
-            // C3 wieder nach vorne und prüfen, dass Amazon-Home weiter läuft.
+            // C3 wieder nach vorne; Speicher erst nach einer kurzen Pause messen.
             Adb("-s " + serial + " shell am start -n " + MainActivity, 20000);
+            Status("Messe Arbeitsspeicher …");
+            Thread.Sleep(5000);
             int after = MemAvailableMb(serial);
             Log("Arbeitsspeicher frei nachher: " + after + " MB" + (before > 0 && after > 0 ? " (" + (after - before >= 0 ? "+" : "") + (after - before) + " MB)" : ""));
-            Log(done + " abgeschaltet, " + already + " waren schon aus, " + failed + " gesperrt, " + missing + " nicht vorhanden.");
+            Log(done + " abgeschaltet, " + already + " waren schon aus, " + isProtected + " geschützt, " +
+                failed + " fehlgeschlagen, " + missing + " nicht vorhanden.");
+            LogTopMemory(serial);
             RefreshDebloatState(serial);
-            Status("Entrümpelt: " + (done + already) + " Amazon-Dienste aus" + (failed > 0 ? ", " + failed + " gesperrt" : "") + ". Rückgängig jederzeit möglich.");
+            Status("Entrümpelt: " + (done + already) + " Amazon-Dienste aus" + (failed > 0 ? ", " + failed + " fehlgeschlagen" : "") + ". Rückgängig jederzeit möglich.");
         }
 
         void DoRestore(string ip)
@@ -162,6 +172,36 @@ namespace C3
             }
             RefreshDebloatState(serial);
             Status(restored == 0 ? "Nichts abgeschaltet – alles war schon an." : restored + " Amazon-Dienste wieder eingeschaltet.");
+        }
+
+        static string FirstLine(string text)
+        {
+            foreach (string line in text.Split('\n'))
+            {
+                string t = line.Trim();
+                if (t.StartsWith("java.lang.")) return t;
+            }
+            int nl = text.IndexOf('\n');
+            return nl > 0 ? text.Substring(0, nl).Trim() : text;
+        }
+
+        /// Nur lesend: die größten Speicherverbraucher (PSS) am TV – zeigt, was wirklich bremst.
+        void LogTopMemory(string serial)
+        {
+            string m = Adb("-s " + serial + " shell dumpsys meminfo", 60000);
+            int start = m.IndexOf("Total PSS by process:", StringComparison.Ordinal);
+            if (start < 0) { Log("Speicherverbraucher: nicht lesbar."); return; }
+            Log("");
+            Log("Größte Speicherverbraucher am TV (PSS):");
+            int shown = 0;
+            foreach (string line in m.Substring(start).Split('\n'))
+            {
+                var match = Regex.Match(line, @"^\s*([\d,\.]+)K:\s+(\S+)");
+                if (!match.Success) { if (shown > 0) break; continue; }
+                long kb = long.Parse(match.Groups[1].Value.Replace(",", "").Replace(".", ""));
+                Log(string.Format("{0,6} MB  {1}", kb / 1024, match.Groups[2].Value));
+                if (++shown >= 15) break;
+            }
         }
 
         /// Pill: wie viele Pakete der Listen gerade aus sind.
