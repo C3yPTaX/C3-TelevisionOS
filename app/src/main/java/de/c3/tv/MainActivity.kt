@@ -99,6 +99,8 @@ class MainActivity : Activity() {
     private lateinit var recentApps: RecentApps
     /** Options panel or "Laufende Apps" over the home screen; focus behind it is blocked. */
     private var overlay: View? = null
+    /** Key pressed down while the overlay was open; its release closes the overlay. */
+    private var overlayCloseKey: Int? = null
     /** Gets the focus back when the overlay closes (tile or system bar button). */
     private var optionsAnchor: View? = null
     private var movingTile: Tile? = null
@@ -209,7 +211,10 @@ class MainActivity : Activity() {
             return true // keep the tile in place while moving; volume etc. pass through
         }
         if (overlay != null && (code == KeyEvent.KEYCODE_BACK || code == KeyEvent.KEYCODE_ESCAPE || code == KeyEvent.KEYCODE_MENU)) {
-            if (event.action == KeyEvent.ACTION_UP) closeOverlay()
+            // Close on release, but only for a press that started while the overlay was open:
+            // releasing the MENU press that opened "Laufende Apps" must not close it again.
+            if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) overlayCloseKey = code
+            if (event.action == KeyEvent.ACTION_UP && overlayCloseKey == code) closeOverlay()
             return true
         }
         return super.dispatchKeyEvent(event)
@@ -652,6 +657,7 @@ class MainActivity : Activity() {
 
     private fun showOverlay(panel: View, focus: View) {
         overlay = panel
+        overlayCloseKey = null
         setBehindFocusable(false)
         (window.decorView as ViewGroup).addView(panel, ViewGroup.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT,

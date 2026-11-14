@@ -2,6 +2,10 @@
 
 Version: Datei `VERSION` (x.y.z).
 
+## 0.8.1
+
+- TV: „Laufende Apps“ bleibt nach dem Loslassen der Menü-Taste offen.
+
 ## 0.8.0
 
 - TV: Die **Menü-Taste ☰** öffnet „Laufende Apps“: zuletzt benutzte Apps mit Banner,
