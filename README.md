@@ -38,6 +38,7 @@ Mit dem Haken **Entwicklerversion** nutzt er den Testkanal
 - **Privat:** Seiten verwalten (auf dem PC verschlüsselt gespeichert), **Privat an**, **Privat aus**
   (löscht die Silk-Daten), iPhone für „An C3 TV senden“ einrichten
 - **Sunshine:** erkennen und per winget installieren
+- **Amazon entrümpeln:** Werbung, Datensammlung und ungenutzte Amazon-Dienste abschalten, **Rückgängig** jederzeit
 
 ## Rückweg
 
@@ -48,6 +49,8 @@ adb uninstall de.c3.tv
 Damit ist alles entfernt, auch der Nutzungszugriff für „Laufende Apps“, den der Updater
 erteilt (einzeln zurücknehmen: `adb shell appops set de.c3.tv GET_USAGE_STATS default`).
 Fire OS und der Amazon-Homescreen bleiben dabei unverändert.
+Mit „Amazon entrümpeln“ abgeschaltete Dienste schaltet im Updater **Rückgängig** wieder ein
+(das bleibt auch nach dem Entfernen von C3 nötig).
 
 ## Projekt
 

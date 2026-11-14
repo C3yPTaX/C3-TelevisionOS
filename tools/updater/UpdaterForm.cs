@@ -131,7 +131,30 @@ namespace C3
             Setup(addPcButton, "+  Diesen PC hinzufügen", false);
             Place(pcCard, addPcButton, 16, 82, 540, 36);
             addPcButton.Click += delegate { RunAsync(Job.AddPc); };
-            y += 132;
+            y += 132 + 14;
+
+            // ---------------------------------------------------------------- Amazon entrümpeln
+            var debloat = NewCard(LeftX, y, 124);
+            debloat.Controls.Add(CardLabel("Amazon entrümpeln", 16, 12));
+            debloatPill.Height = 22;
+            debloatPill.Location = new Point(CardW - 16 - 70, 12);
+            debloat.Controls.Add(debloatPill);
+            debloatPill.Set("–", Theme.Muted, Theme.Field);
+            debloatExtendedCheck.Text = "Auch Fotos, Musik, Casting und Benachrichtigungen";
+            debloatExtendedCheck.Checked = true;
+            debloatExtendedCheck.AutoSize = true;
+            debloatExtendedCheck.ForeColor = Theme.Muted;
+            debloatExtendedCheck.Font = Theme.Font(9f, false);
+            debloatExtendedCheck.BackColor = Theme.Card;
+            debloatExtendedCheck.Location = new Point(16, 42);
+            debloat.Controls.Add(debloatExtendedCheck);
+            Setup(debloatButton, "Entrümpeln", false);
+            Place(debloat, debloatButton, 16, 72, 268, 36);
+            debloatButton.Click += delegate { RunAsync(Job.Debloat); };
+            Setup(restoreButton, "Rückgängig", false);
+            Place(debloat, restoreButton, 292, 72, 264, 36);
+            restoreButton.Click += delegate { RunAsync(Job.Restore); };
+            y += 124;
             int leftBottom = y;
 
             // ================================================================ rechte Spalte
@@ -371,7 +394,7 @@ namespace C3
 
         void SetBusy(bool busy)
         {
-            foreach (var b in new Control[] { updateButton, startButton, redirectOnButton, redirectOffButton, addPcButton, removePcButton, pcBox, ipField, nameField, deviceBox, saveButton, privateOnButton, privateOffButton, addSiteButton, siteBox, siteNameField, siteUrlField })
+            foreach (var b in new Control[] { updateButton, startButton, redirectOnButton, redirectOffButton, addPcButton, removePcButton, pcBox, ipField, nameField, deviceBox, saveButton, privateOnButton, privateOffButton, addSiteButton, siteBox, siteNameField, siteUrlField, debloatButton, restoreButton, debloatExtendedCheck })
                 b.Enabled = !busy;
             removeButton.Enabled = !busy && devices.Count > 0;
             removeSiteButton.Enabled = !busy && sites.Count > 0;

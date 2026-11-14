@@ -72,6 +72,16 @@ das Öffnen vorher (`requestSettings`), die Umleitung pausiert, solange Launcher
 🟡 Am Gerät zu bestätigen: ob Fire OS die Home-Taste an den Dienst liefert. Falls nicht, führt
 Home aus den Einstellungen zu Amazon-Home; ein weiterer Start von C3 beendet die Pause.
 
+## 4a. Amazon entrümpeln (0.10.0, ungetestet)
+
+Updater-Karte „Amazon entrümpeln“: `pm disable-user --user 0` für eine kuratierte Liste
+(`tools/updater/Debloat.cs`), Rückweg `pm enable` über „Rückgängig“ oder Werkseinstellungen.
+Quellen: Community-Listen für Fire-TV-Sticks/Cube (JLCareglio-Gist, dumbtv.org, XDA Cube 3,
+cleanyourtv). Bewusst **nicht** abgeschaltet: Launcher (Home-Umleitung), Einstellungen,
+Appstore, Tastatur, HDMI/Eingänge, Fernbedienung, WebView, OTA, Uhrzeit, Prime Video, Netflix,
+Silk sowie `com.amazon.imp` (zerstörte laut Quelle Home). Ergebnis am Gerät (welche Pakete
+Fire OS 8.1.8.5 sperrt, Speichergewinn) hier nachtragen.
+
 ## 5. Streaming-Apps
 
 | App | Paket / Start-Activity | Status |

@@ -2,6 +2,13 @@
 
 Version: Datei `VERSION` (x.y.z).
 
+## 0.10.0
+
+- Updater: Karte **Amazon entrümpeln** schaltet Werbung, Datensammlung (u. a. Inhaltserkennung)
+  und ungenutzte Amazon-Dienste per ADB ab, ohne Root und ohne etwas zu löschen.
+  Optional auch Fotos, Musik, Casting und Benachrichtigungen. **Rückgängig** schaltet alles
+  wieder ein. Das Protokoll zeigt jedes Paket und den freien Arbeitsspeicher vorher/nachher.
+
 ## 0.9.1
 
 - TV: „Einstellungen“ in der Systemleiste öffnet die Fire-TV-Einstellungen auch bei

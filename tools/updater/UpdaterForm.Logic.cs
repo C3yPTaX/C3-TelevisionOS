@@ -168,7 +168,9 @@ namespace C3
 
         // ------------------------------------------------------------------ workflow
 
-        enum Job { Update, Start, RedirectOn, RedirectOff, AddPc, RemovePc, InstallSunshine, PrivateOn, PrivateOff }
+        enum Job { Update, Start, RedirectOn, RedirectOff, AddPc, RemovePc, InstallSunshine, PrivateOn, PrivateOff, Debloat, Restore }
+
+        bool debloatExtended = true;
 
         void RunAsync(Job job)
         {
@@ -179,6 +181,15 @@ namespace C3
                 return;
             }
             if (ip.Length > 0) RememberIp(ip);
+            if (job == Job.Debloat)
+            {
+                var answer = MessageBox.Show(this,
+                    "Amazon-Werbung, Datensammlung und ungenutzte Dienste am TV abschalten?\n\n" +
+                    "Es wird nichts gelöscht. „Rückgängig“ schaltet alles wieder ein.",
+                    "Amazon entrümpeln", MessageBoxButtons.OKCancel, MessageBoxIcon.Question);
+                if (answer != DialogResult.OK) return;
+            }
+            debloatExtended = debloatExtendedCheck.Checked; // read on the UI thread
             SetBusy(true);
             log.Clear();
 
@@ -197,6 +208,8 @@ namespace C3
                         case Job.InstallSunshine: DoInstallSunshine(); break;
                         case Job.PrivateOn: DoPrivate(ip, true); break;
                         case Job.PrivateOff: DoPrivate(ip, false); break;
+                        case Job.Debloat: DoDebloat(ip, debloatExtended); break;
+                        case Job.Restore: DoRestore(ip); break;
                     }
                 }
                 catch (Exception e)
