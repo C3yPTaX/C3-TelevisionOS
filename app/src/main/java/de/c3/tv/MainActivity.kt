@@ -44,10 +44,10 @@ import java.util.concurrent.Executors
 /**
  * C3 Television OS home screen. Single activity, views built in code (design system:
  * docs/04-design-proposal.md), no background work except one short-lived thread that
- * loads apps, banners and TV inputs, and the PC status check while the screen is visible.
+ * loads app banners and TV inputs, and the PC status check while the screen is visible.
  *
- * Rows: Favoriten (own order, catalog apps that are missing at the end), Geräte, Web, Privat,
- * Alle Apps (grid). Long press OK on an app opens its options (move, favourite, hide).
+ * Rows: Favoriten (own order, catalog apps that are missing at the end), Geräte, Web, Privat.
+ * Long press OK on an app opens its options (move, hide, show hidden again).
  */
 class MainActivity : Activity() {
 
@@ -77,12 +77,11 @@ class MainActivity : Activity() {
     private lateinit var shelfCategory: TextView
     private lateinit var shelfTitle: TextView
 
-    // Apps: favourites row + "Alle Apps" grid, rebuilt only when the content changes.
+    // Favourites row, rebuilt only when its content changes.
     private lateinit var rowsContainer: LinearLayout
     private lateinit var favouritesRow: LinearLayout
-    private lateinit var allAppsTitle: View
-    private lateinit var allAppsGrid: LinearLayout
-    private var installedApps: List<AppLauncher.InstalledApp>? = null
+    /** Installed favourite/catalog packages; null until the first [refresh] of this process. */
+    private var installedPkgs: Set<String>? = null
     private var catalogResolved: Map<String, String?> = emptyMap()
     private var appsSignature = ""
     private val artwork = ConcurrentHashMap<String, Art>()
@@ -107,9 +106,11 @@ class MainActivity : Activity() {
     private class Art(val artwork: AppLauncher.Artwork?, val glow: Int?)
 
     private class AppsModel(
+        /** Visible favourites (without hidden ones). */
         val favourites: List<HomeLayout.Favourite>,
+        /** Stored order including hidden favourites, so "einblenden" brings them back in place. */
+        val stored: List<HomeLayout.Favourite>,
         val placeholders: List<AppEntry>,
-        val others: List<AppLauncher.InstalledApp>,
         val hiddenCount: Int,
         val seen: Set<String>,
     ) {
@@ -117,8 +118,6 @@ class MainActivity : Activity() {
             favourites.forEach { append(it.pkg).append('=').append(it.label).append(';') }
             append('|')
             placeholders.forEach { append(it.title).append(';') }
-            append('|')
-            others.forEach { append(it.pkg).append('=').append(it.label).append(';') }
             append('|').append(hiddenCount)
         }
     }
@@ -304,14 +303,6 @@ class MainActivity : Activity() {
         rows.addView(pTitle)
         rows.addView(pRow)
 
-        allAppsTitle = sectionTitle("Alle Apps").apply { visibility = View.GONE }
-        rows.addView(allAppsTitle)
-        allAppsGrid = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            clipChildren = false
-            clipToPadding = false
-        }
-        rows.addView(allAppsGrid)
 
         glowFront = glowLayer()
         glowBack = glowLayer()
@@ -505,45 +496,35 @@ class MainActivity : Activity() {
     }
 
     /**
-     * Arrangement from the stored layout and the latest app list. Before the first [refresh]
-     * of this process ([installedApps] == null) only stored data is used, so the first frame
+     * Arrangement from the stored layout and the latest install state. Before the first [refresh]
+     * of this process ([installedPkgs] == null) only stored data is used, so the first frame
      * needs no PackageManager call.
      */
     private fun computeModel(): AppsModel {
         val hidden = home.hidden()
         val seen = home.seenCatalog().toMutableSet()
-        val all = installedApps
-        val labels = all?.associate { it.pkg to it.label }.orEmpty()
-        val installedPkgs = labels.keys + catalogResolved.values.filterNotNull()
+        val installed = installedPkgs
 
-        val favs = home.favourites()
-            .filter { all == null || it.pkg in installedPkgs }
-            .filter { appKey(it.pkg) !in hidden }
-            .map { HomeLayout.Favourite(it.pkg, labels[it.pkg] ?: it.label) }
+        val stored = home.favourites()
+            .filter { installed == null || it.pkg in installed }
             .toMutableList()
-        if (all != null) {
+        if (installed != null) {
             AppCatalog.streaming.forEach { entry ->
                 val pkg = catalogResolved[entry.title] ?: return@forEach
                 if (!seen.add(entry.title)) return@forEach
-                if (favs.none { it.pkg == pkg } && appKey(pkg) !in hidden) {
-                    favs += HomeLayout.Favourite(pkg, labels[pkg] ?: entry.title)
-                }
+                if (stored.none { it.pkg == pkg }) stored += HomeLayout.Favourite(pkg, entry.title)
             }
         }
+        val favs = stored.filter { appKey(it.pkg) !in hidden }
         val placeholders = AppCatalog.streaming.filter { entry ->
-            entry.title !in seen && (all == null || catalogResolved[entry.title] == null) &&
+            entry.title !in seen && (installed == null || catalogResolved[entry.title] == null) &&
                 HomeLayout.catalogKey(entry) !in hidden
         }
-        val favPkgs = favs.map { it.pkg }.toSet()
-        val others = all.orEmpty().filter { it.pkg !in favPkgs && appKey(it.pkg) !in hidden }
-        val hiddenCount = hidden.count { key ->
-            if (key.startsWith("cat:")) true else key.removePrefix("app:") in installedPkgs || all == null
-        }
-        return AppsModel(favs, placeholders, others, hiddenCount, seen)
+        return AppsModel(favs, stored, placeholders, hidden.size, seen)
     }
 
     private fun applyApps(model: AppsModel) {
-        home.saveFavourites(model.favourites)
+        home.saveFavourites(model.stored)
         home.setSeenCatalog(model.seen)
         if (model.signature == appsSignature) return
         appsSignature = model.signature
@@ -562,32 +543,17 @@ class MainActivity : Activity() {
             })
         }
 
-        allAppsGrid.removeAllViews()
-        val gridTiles = model.others.map { appTile(appKey(it.pkg), it.label, it.pkg, "Alle Apps") }.toMutableList()
-        if (model.hiddenCount > 0) {
-            gridTiles += Tile(this, Tile.Style.APP).apply {
+        // Everything hidden: one tile brings the apps back (otherwise this is in the options).
+        if (favouritesRow.childCount == 0 && model.hiddenCount > 0) {
+            favouritesRow.addView(Tile(this, Tile.Style.APP).apply {
                 key = KEY_RESTORE
                 setTitle("Ausgeblendete einblenden (${model.hiddenCount})")
-                shelfCategory = "Alle Apps"
+                shelfCategory = "Favoriten"
                 shelfTitle = "Ausgeblendete Apps"
                 onFocused = { onTileFocused(it) }
                 setOnClickListener { restoreHidden() }
-            }
-        }
-        gridTiles.chunked(GRID_COLUMNS).forEach { line ->
-            allAppsGrid.addView(LinearLayout(this).apply {
-                orientation = LinearLayout.HORIZONTAL
-                clipChildren = false
-                clipToPadding = false
-                val v = dp(6)
-                setPadding(0, v, 0, v)
-                line.forEachIndexed { i, tile ->
-                    if (i == line.lastIndex) (tile.layoutParams as LinearLayout.LayoutParams).marginEnd = 0
-                    addView(tile)
-                }
             })
         }
-        allAppsTitle.visibility = if (gridTiles.isEmpty()) View.GONE else View.VISIBLE
 
         when {
             restorePendingFocus() -> {}
@@ -622,7 +588,7 @@ class MainActivity : Activity() {
     private fun isInApps(view: View): Boolean {
         var v: View? = view
         while (v != null) {
-            if (v === favouritesRow || v === allAppsGrid) return true
+            if (v === favouritesRow) return true
             v = v.parent as? View
         }
         return false
@@ -660,22 +626,18 @@ class MainActivity : Activity() {
         if (options != null || movingTile != null) return
         val key = tile.key
         val pkg = key.takeIf { it.startsWith("app:") }?.removePrefix("app:")
-        val inFavourites = tile.parent === favouritesRow
         val title = tile.shelfTitle
         val items = mutableListOf<Pair<String, () -> Unit>>()
         when {
-            pkg != null && inFavourites -> {
-                items += "Verschieben" to { startMove(tile) }
-                items += "Aus Favoriten entfernen" to { removeFavourite(pkg) }
-                items += "Ausblenden" to { hide(key) }
-            }
             pkg != null -> {
-                items += "Zu Favoriten hinzufügen" to { addFavourite(pkg, title) }
+                items += "Verschieben" to { startMove(tile) }
                 items += "Ausblenden" to { hide(key) }
             }
             key.startsWith("cat:") -> items += "Ausblenden" to { hide(key) }
             else -> return
         }
+        val hiddenCount = home.hidden().size
+        if (hiddenCount > 0) items += "Ausgeblendete einblenden ($hiddenCount)" to { restoreHidden() }
         val panel = OptionsPanel(this, title, items) { closeOptions() }
         options = panel
         optionsAnchor = tile
@@ -729,35 +691,20 @@ class MainActivity : Activity() {
         val order = (0 until favouritesRow.childCount)
             .mapNotNull { (favouritesRow.getChildAt(it) as? Tile)?.key?.takeIf { k -> k.startsWith("app:") } }
             .map { it.removePrefix("app:") }
-        val byPkg = home.favourites().associateBy { it.pkg }
-        home.saveFavourites(order.mapNotNull { byPkg[it] })
+        val stored = home.favourites()
+        val byPkg = stored.associateBy { it.pkg }
+        // Visible favourites in the new order, hidden ones keep their place at the end.
+        home.saveFavourites(order.mapNotNull { byPkg[it] } + stored.filter { it.pkg !in order })
         // The row already shows the new order: only remember it, no rebuild.
         appsSignature = computeModel().signature
         if (tile.isFocused) onTileFocused(tile)
     }
 
-    private fun addFavourite(pkg: String, label: String) {
-        home.saveFavourites(home.favourites() + HomeLayout.Favourite(pkg, label))
-        pendingFocusKey = appKey(pkg)
-        applyApps(computeModel())
-        toast("$label ist jetzt ein Favorit")
-    }
-
-    private fun removeFavourite(pkg: String) {
-        home.saveFavourites(home.favourites().filter { it.pkg != pkg })
-        // Keep the focus in the favourites row instead of jumping into the grid.
-        val row = favouritesRow
-        val index = (0 until row.childCount).firstOrNull { (row.getChildAt(it) as? Tile)?.key == appKey(pkg) } ?: 0
-        applyApps(computeModel())
-        row.getChildAt(index.coerceAtMost(row.childCount - 1))?.requestFocus()
-    }
-
     private fun hide(key: String) {
         home.setHidden(home.hidden() + key)
-        if (key.startsWith("app:")) home.saveFavourites(home.favourites().filter { appKey(it.pkg) != key })
         applyApps(computeModel())
         if (currentFocus?.isShown != true) focusFirst()
-        toast("Ausgeblendet – unter „Alle Apps“ wieder einblendbar")
+        toast("Ausgeblendet – OK lang drücken auf einer App blendet es wieder ein")
     }
 
     private fun restoreHidden() {
@@ -776,11 +723,11 @@ class MainActivity : Activity() {
      */
     private fun refresh() {
         val executor = Executors.newSingleThreadExecutor().also { io = it }
-        val exclude = EXCLUDED_PACKAGES + packageName
         val hidden = home.hidden()
+        val favourites = home.favourites().map { it.pkg }
         executor.execute {
             val catalog = AppCatalog.streaming.associate { it.title to launcher.resolve(it) }
-            val apps = launcher.installedApps(exclude)
+            val installed = (favourites.filter { launcher.launchIntent(it) != null } + catalog.values.filterNotNull()).toSet()
             val moonlightInstalled = launcher.resolve(AppCatalog.moonlight) != null
             val silkAvailable = launcher.resolve(WebStore.silk) != null
             val inputs = tvInputs.list()
@@ -790,7 +737,7 @@ class MainActivity : Activity() {
 
             mainHandler.post {
                 if (isDestroyed) return@post
-                installedApps = apps
+                installedPkgs = installed
                 catalogResolved = catalog
                 applyApps(computeModel())
                 this.moonlightInstalled = moonlightInstalled
@@ -801,9 +748,8 @@ class MainActivity : Activity() {
                 restorePendingFocus()
             }
 
-            // Banners: favourites first, hidden apps skipped, each package loaded once per process.
-            val order = (catalog.values.filterNotNull() + apps.map { it.pkg }).distinct()
-                .filter { appKey(it) !in hidden && !artwork.containsKey(it) }
+            // Banners: hidden apps skipped, each package loaded once per process.
+            val order = installed.filter { appKey(it) !in hidden && !artwork.containsKey(it) }
             for (pkg in order) {
                 if (Thread.currentThread().isInterrupted) return@execute
                 val art = launcher.loadArtwork(pkg)
@@ -944,20 +890,10 @@ class MainActivity : Activity() {
     private fun toast(message: String) = Toast.makeText(this, message, Toast.LENGTH_LONG).show()
 
     companion object {
-        private const val GRID_COLUMNS = 6
         private const val GLOW_ALPHA = 0.32f
         private const val GLOW_FADE_MS = 320L
         private const val PLAYSTATION_BLUE = 0xFF2F6FE0.toInt()
         private const val KEY_RESTORE = "hidden"
-
-        /** Shown elsewhere (dock, Web row) or not meant to be started from C3. */
-        private val EXCLUDED_PACKAGES = setOf(
-            "com.amazon.tv.launcher",
-            "com.amazon.tv.settings.v2",
-            "com.amazon.firehomestarter",
-            "com.amazon.servicemenu",
-            WebStore.SILK_PACKAGE,
-        )
 
         private val MOVE_KEYS = setOf(
             KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN,

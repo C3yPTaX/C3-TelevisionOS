@@ -7,8 +7,7 @@ Läuft als normale App auf Fire OS: keine Firmware-Änderung, kein Root, jederze
 
 | Bereich | Was es kann |
 | --- | --- |
-| **Favoriten** | eigene Reihenfolge; Netflix, Prime Video, YouTube, Twitch, Disney+, RTL+ sind vorbelegt |
-| **Alle Apps** | jede installierte App starten, zu Favoriten hinzufügen oder ausblenden |
+| **Favoriten** | Netflix, Prime Video, YouTube, Twitch, Disney+, RTL+ in eigener Reihenfolge, einzeln ausblendbar |
 | **Geräte** | PlayStation 5 und HDMI-Eingänge im Vollbild, PCs per Moonlight/Sunshine (C3 Desktop) mit Online-Status |
 | **Home-Taste** | führt zu C3, zweimal drücken führt zu Amazon |
 | **Privat** | Browser und eigene Seiten, nur sichtbar, solange im Updater eingeschaltet |
@@ -16,8 +15,7 @@ Läuft als normale App auf Fire OS: keine Firmware-Änderung, kein Root, jederze
 | **Systemleiste** | Einstellungen, Netzwerk, Bluetooth, Geräteinfo, Fire TV |
 
 Auf dem Homescreen öffnet die **Menü-Taste ☰** die Diagnose.
-**OK lang drücken** auf einer App öffnet ihre Optionen (Verschieben, Favorit, Ausblenden).
-Ausgeblendete Apps holt die letzte Kachel unter „Alle Apps“ zurück.
+**OK lang drücken** auf einer App öffnet ihre Optionen (Verschieben, Ausblenden, Ausgeblendete einblenden).
 
 ## Installation
 
