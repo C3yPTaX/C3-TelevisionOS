@@ -90,6 +90,16 @@ Arbeitsspeicher frei 553 → 549 MB direkt danach: **kein messbarer Gewinn** –
 kaum dauerhaft. Nutzen: weniger Hintergrund-/Netzverkehr, ACR aus. Für spürbar mehr Tempo
 müssen die echten Verbraucher bekannt sein (ab 0.10.1 im Protokoll).
 
+**Größte Verbraucher (PSS, nach dem Entrümpeln, C3 im Vordergrund):** system 140 MB,
+`com.amazon.tv.launcher` 115, `de.c3.tv` 82, surfaceflinger 67, `com.amazon.venezia` 44,
+`com.amazon.vizzini` 39, `com.amazon.device.services` 35, systemui 26, `com.amazon.tcomm` 25,
+`com.vewd.core.service:browser_process` 24, `com.amazon.alexa.externalmediaplayer.fireos` 19,
+`com.amazon.tv.devicecontrol` 18, `com.amazon.tv.settings.v2` 17, Audio-HAL 16,
+`com.amazon.alexamediaplayer.runtime.ftv` 15.
+→ 0.11.0: optionale Gruppen **Alexa** (vizzini, tcomm, `com.amazon.alexa*`) und **Vewd**
+(`com.vewd.*`, HbbTV für Antenne/Kabel) – der Nutzer nutzt weder Alexa noch Live-TV.
+Bleiben an: Launcher (Home-Umleitung), Appstore (Lizenzen), device.services, devicecontrol (CEC).
+
 ## 5. Streaming-Apps
 
 | App | Paket / Start-Activity | Status |

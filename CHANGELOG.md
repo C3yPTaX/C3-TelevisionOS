@@ -2,6 +2,13 @@
 
 Version: Datei `VERSION` (x.y.z).
 
+## 0.11.0
+
+- Updater, „Amazon entrümpeln“: neue Haken **Alexa und Sprachsuche** (Sprachsteuerung,
+  Alexa-Musik, Cloud-Verbindung, alle `com.amazon.alexa*`-Pakete) und
+  **Live-TV-Browser (HbbTV)** (alle `com.vewd.*`-Pakete). Laut Messung am TV zusammen ~120 MB.
+  Die Sicherheitsabfrage nennt die Nebenwirkungen, „Rückgängig“ deckt beides ab.
+
 ## 0.10.1
 
 - Updater: „Entrümpeln“ zeigt danach die 15 größten Speicherverbraucher am TV, misst den

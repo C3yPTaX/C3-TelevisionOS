@@ -58,6 +58,18 @@ namespace C3
             new[] { "com.amazon.ftv.profilepicker", "Profilauswahl beim Start" },
         };
 
+        /// Alexa und Sprachsteuerung (spart laut Messung am TV ~100 MB). Dazu jedes installierte
+        /// Paket, das mit einem der Präfixe in DebloatAlexaPrefixes beginnt.
+        static readonly string[][] DebloatAlexa =
+        {
+            new[] { "com.amazon.vizzini", "Alexa-Sprachsteuerung" },
+            new[] { "com.amazon.tcomm", "Cloud-Verbindung für Alexa" },
+        };
+        static readonly string[] DebloatAlexaPrefixes = { "com.amazon.alexa" };
+
+        /// Vewd: Browser-Engine für HbbTV bei Antenne/Kabel (Live-TV). Alle Pakete mit diesem Präfix.
+        static readonly string[] DebloatVewdPrefixes = { "com.vewd." };
+
         /// Wird nie abgeschaltet – auch wenn es versehentlich in einer Liste landet.
         static readonly HashSet<string> DebloatProtected = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
@@ -78,14 +90,30 @@ namespace C3
         };
 
         readonly CheckBox debloatExtendedCheck = new CheckBox();
+        readonly CheckBox debloatAlexaCheck = new CheckBox();
+        readonly CheckBox debloatVewdCheck = new CheckBox();
         readonly Pill debloatPill = new Pill();
         readonly RoundButton debloatButton = new RoundButton();
         readonly RoundButton restoreButton = new RoundButton();
 
-        List<string[]> DebloatSelection(bool extended)
+        /// Feste Listen plus alle Pakete aus [known], die zu einem gewählten Präfix passen.
+        List<string[]> DebloatSelection(bool extended, bool alexa, bool vewd, ICollection<string> known)
         {
             var list = new List<string[]>(DebloatBasic);
             if (extended) list.AddRange(DebloatExtended);
+            if (alexa) list.AddRange(DebloatAlexa);
+            var listed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (string[] p in list) listed.Add(p[0]);
+            var prefixes = new List<string[]>();
+            if (alexa) foreach (string x in DebloatAlexaPrefixes) prefixes.Add(new[] { x, "Alexa" });
+            if (vewd) foreach (string x in DebloatVewdPrefixes) prefixes.Add(new[] { x, "Live-TV-Browser (Vewd/HbbTV)" });
+            var matches = new List<string>();
+            foreach (string pkg in known)
+                foreach (string[] pre in prefixes)
+                    if (pkg.StartsWith(pre[0], StringComparison.OrdinalIgnoreCase) && listed.Add(pkg))
+                        matches.Add(pkg + "|" + pre[1]);
+            matches.Sort(StringComparer.OrdinalIgnoreCase);
+            foreach (string m in matches) list.Add(m.Split('|'));
             return list.FindAll(delegate (string[] p) { return !DebloatProtected.Contains(p[0]); });
         }
 
@@ -108,7 +136,7 @@ namespace C3
             return match.Success ? int.Parse(match.Groups[1].Value) / 1024 : -1;
         }
 
-        void DoDebloat(string ip, bool extended)
+        void DoDebloat(string ip, bool extended, bool alexa, bool vewd)
         {
             string serial = Connect(ip);
             if (serial == null) return;
@@ -119,7 +147,7 @@ namespace C3
             Log("Arbeitsspeicher frei vorher: " + before + " MB");
 
             int done = 0, already = 0, missing = 0, failed = 0, isProtected = 0;
-            foreach (string[] p in DebloatSelection(extended))
+            foreach (string[] p in DebloatSelection(extended, alexa, vewd, installed))
             {
                 string pkg = p[0];
                 if (!installed.Contains(pkg)) { missing++; Log("–  " + pkg + "  (nicht vorhanden)"); continue; }
@@ -163,7 +191,7 @@ namespace C3
 
             HashSet<string> disabled = PackageSet(serial, "-d");
             int restored = 0;
-            foreach (string[] p in DebloatSelection(true))
+            foreach (string[] p in DebloatSelection(true, true, true, disabled))
             {
                 if (!disabled.Contains(p[0])) continue;
                 Status("Schalte ein: " + p[1] + " …");
@@ -209,7 +237,7 @@ namespace C3
         {
             HashSet<string> disabled = PackageSet(serial, "-d");
             int off = 0;
-            foreach (string[] p in DebloatSelection(true)) if (disabled.Contains(p[0])) off++;
+            foreach (string[] p in DebloatSelection(true, true, true, disabled)) if (disabled.Contains(p[0])) off++;
             UI(delegate
             {
                 if (off == 0) debloatPill.Set("–", Theme.Muted, Theme.Field);

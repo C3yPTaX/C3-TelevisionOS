@@ -134,7 +134,7 @@ namespace C3
             y += 132 + 14;
 
             // ---------------------------------------------------------------- Amazon entrümpeln
-            var debloat = NewCard(LeftX, y, 124);
+            var debloat = NewCard(LeftX, y, 148);
             debloat.Controls.Add(CardLabel("Amazon entrümpeln", 16, 12));
             debloatPill.Height = 22;
             debloatPill.Location = new Point(CardW - 16 - 70, 12);
@@ -148,13 +148,26 @@ namespace C3
             debloatExtendedCheck.BackColor = Theme.Card;
             debloatExtendedCheck.Location = new Point(16, 42);
             debloat.Controls.Add(debloatExtendedCheck);
+            foreach (var c in new[] { debloatAlexaCheck, debloatVewdCheck })
+            {
+                c.Checked = true;
+                c.AutoSize = true;
+                c.ForeColor = Theme.Muted;
+                c.Font = Theme.Font(9f, false);
+                c.BackColor = Theme.Card;
+                debloat.Controls.Add(c);
+            }
+            debloatAlexaCheck.Text = "Alexa und Sprachsuche";
+            debloatAlexaCheck.Location = new Point(16, 66);
+            debloatVewdCheck.Text = "Live-TV-Browser (HbbTV)";
+            debloatVewdCheck.Location = new Point(292, 66);
             Setup(debloatButton, "Entrümpeln", false);
-            Place(debloat, debloatButton, 16, 72, 268, 36);
+            Place(debloat, debloatButton, 16, 96, 268, 36);
             debloatButton.Click += delegate { RunAsync(Job.Debloat); };
             Setup(restoreButton, "Rückgängig", false);
-            Place(debloat, restoreButton, 292, 72, 264, 36);
+            Place(debloat, restoreButton, 292, 96, 264, 36);
             restoreButton.Click += delegate { RunAsync(Job.Restore); };
-            y += 124;
+            y += 148;
             int leftBottom = y;
 
             // ================================================================ rechte Spalte
@@ -394,7 +407,7 @@ namespace C3
 
         void SetBusy(bool busy)
         {
-            foreach (var b in new Control[] { updateButton, startButton, redirectOnButton, redirectOffButton, addPcButton, removePcButton, pcBox, ipField, nameField, deviceBox, saveButton, privateOnButton, privateOffButton, addSiteButton, siteBox, siteNameField, siteUrlField, debloatButton, restoreButton, debloatExtendedCheck })
+            foreach (var b in new Control[] { updateButton, startButton, redirectOnButton, redirectOffButton, addPcButton, removePcButton, pcBox, ipField, nameField, deviceBox, saveButton, privateOnButton, privateOffButton, addSiteButton, siteBox, siteNameField, siteUrlField, debloatButton, restoreButton, debloatExtendedCheck, debloatAlexaCheck, debloatVewdCheck })
                 b.Enabled = !busy;
             removeButton.Enabled = !busy && devices.Count > 0;
             removeSiteButton.Enabled = !busy && sites.Count > 0;

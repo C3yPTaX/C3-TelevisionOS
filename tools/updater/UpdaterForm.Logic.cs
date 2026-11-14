@@ -170,7 +170,7 @@ namespace C3
 
         enum Job { Update, Start, RedirectOn, RedirectOff, AddPc, RemovePc, InstallSunshine, PrivateOn, PrivateOff, Debloat, Restore }
 
-        bool debloatExtended = true;
+        bool debloatExtended = true, debloatAlexa = true, debloatVewd = true;
 
         void RunAsync(Job job)
         {
@@ -185,11 +185,16 @@ namespace C3
             {
                 var answer = MessageBox.Show(this,
                     "Amazon-Werbung, Datensammlung und ungenutzte Dienste am TV abschalten?\n\n" +
-                    "Es wird nichts gelöscht. „Rückgängig“ schaltet alles wieder ein.",
+                    (debloatAlexaCheck.Checked ? "Alexa und die Sprachsuche der Fernbedienung funktionieren danach nicht mehr.\n" : "") +
+                    (debloatVewdCheck.Checked ? "HbbTV im Live-TV (Antenne/Kabel) funktioniert danach nicht mehr.\n" : "") +
+                    "\nEs wird nichts gelöscht. „Rückgängig“ schaltet alles wieder ein.",
                     "Amazon entrümpeln", MessageBoxButtons.OKCancel, MessageBoxIcon.Question);
                 if (answer != DialogResult.OK) return;
             }
-            debloatExtended = debloatExtendedCheck.Checked; // read on the UI thread
+            // read on the UI thread
+            debloatExtended = debloatExtendedCheck.Checked;
+            debloatAlexa = debloatAlexaCheck.Checked;
+            debloatVewd = debloatVewdCheck.Checked;
             SetBusy(true);
             log.Clear();
 
@@ -208,7 +213,7 @@ namespace C3
                         case Job.InstallSunshine: DoInstallSunshine(); break;
                         case Job.PrivateOn: DoPrivate(ip, true); break;
                         case Job.PrivateOff: DoPrivate(ip, false); break;
-                        case Job.Debloat: DoDebloat(ip, debloatExtended); break;
+                        case Job.Debloat: DoDebloat(ip, debloatExtended, debloatAlexa, debloatVewd); break;
                         case Job.Restore: DoRestore(ip); break;
                     }
                 }
