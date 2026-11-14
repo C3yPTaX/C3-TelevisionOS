@@ -181,7 +181,7 @@ Zielwert C3 Home: Kaltstart **< 500 ms**.
 
 ## 9. Offene Praxistests
 
-Siehe Chatverlauf bzw. Abschnitt 8.3 in `01-feasibility-and-architecture.md`:
+Siehe Abschnitt 8.3 in [`archiv/01-machbarkeit.md`](archiv/01-machbarkeit.md):
 
 1. ~~HDMI-Umschaltung~~ → erledigt: über Amazon nicht möglich; `TvView`-Experiment folgt mit Test-APK
 2. ~~Kaltstartzeiten~~ → erledigt (Abschnitt 7a)

@@ -1,7 +1,7 @@
 # C3-TelevisionOS – Vorschlag Prototyp P0 (zur Freigabe)
 
 > Status: **Vorschlag** – Umsetzung erst nach Freigabe.
-> Grundlage: `02-device-findings.md`
+> Grundlage: `../02-device-findings.md`
 
 ## Ziel
 
