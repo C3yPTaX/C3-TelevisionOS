@@ -2,6 +2,13 @@
 
 Version: Datei `VERSION` (x.y.z).
 
+## 0.6.7
+
+- Projektregeln (`AGENTS.md`): pauschale Verbote (Root, Firmware, Systemeingriffe) durch
+  Grundsätze für experimentelle Eingriffe auf ausdrücklich freigegebenen Testgeräten ersetzt.
+- Neue Analyse `docs/05-usb-power.md`: Machbarkeit der softwareseitigen USB-Stromsteuerung
+  (LED-Strip mit dem TV schalten) – Kurzfazit, Recherche, Belegstatus und lesende Diagnoseschritte.
+
 ## 0.6.6
 
 - README auf Deutsch und gekürzt, Changelog gestrafft, veraltete Planungsdokumente nach `docs/archiv/`.
