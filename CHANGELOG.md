@@ -2,6 +2,11 @@
 
 Nur die wesentlichen Änderungen. Version: Datei `VERSION` (x.y.z).
 
+## 0.6.1
+
+- Updater: Fenster zweispaltig (links Fernseher, Home-Taste, PCs; rechts Privat, Sunshine),
+  dadurch halb so hoch und passend für Laptop-Bildschirme. Bei kleinen Bildschirmen wird gescrollt.
+
 ## 0.6.0
 
 - Neu: „An C3 TV senden“ – Links vom iPhone (Teilen-Menü, App „Kurzbefehle“) öffnen sich
