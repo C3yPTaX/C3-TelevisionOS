@@ -1,64 +1,42 @@
 # Changelog
 
-Nur die wesentlichen Änderungen. Version: Datei `VERSION` (x.y.z).
+Version: Datei `VERSION` (x.y.z).
+
+## 0.6.6
+
+- README auf Deutsch und gekürzt, Changelog gestrafft, veraltete Planungsdokumente nach `docs/archiv/`.
 
 ## 0.6.5
 
-- Updater: aktualisiert sich jetzt selbst. Der Link „Updater aktualisieren“ unten lädt die
-  neue EXE aus dem gewählten Kanal (stabil oder Entwicklerversion), ersetzt die laufende und
-  startet neu. Gibt es eine neuere Version, zeigt der Link das beim Start grün an.
+- Updater: aktualisiert sich selbst („Updater aktualisieren“). Eine neue Version wird grün angezeigt.
 
 ## 0.6.4
 
-- Updater: Leere Eingabefelder zeigen einen grauen Hinweis, was hinein gehört
-  (z. B. „IP des TV, z. B. 192.168.178.23“). Der Hinweis verschwindet beim Hineinklicken.
+- Updater: graue Hinweistexte in leeren Eingabefeldern.
 
 ## 0.6.3
 
-- TV: Die Reihe „Web“ mit der Browser-Kachel erscheint nur noch, solange „Privat“ an ist.
-  „Privat aus“ entfernt sie zusammen mit der Privat-Reihe vom Homescreen.
+- TV: Die Browser-Kachel („Web“) ist nur noch bei „Privat an“ sichtbar.
 
 ## 0.6.2
 
-- TV: Beim Wechsel in untere Reihen (Geräte, Web) schoben sich die Reihen über den großen
-  Titel und unten über den Bildschirmrand. Der Reihenbereich wird jetzt sauber abgeschnitten.
-- TV: Kopfbereich und Abstände kompakter, damit Apps, Geräte und Web ohne Scrollen auf den
-  Bildschirm passen. Mit eingeschaltetem „Privat“ scrollt die Seite wie vorgesehen.
+- TV: Reihen schieben sich beim Scrollen nicht mehr über den Titel. Kompaktere Abstände.
 
 ## 0.6.1
 
-- Updater: Fenster zweispaltig (links Fernseher, Home-Taste, PCs; rechts Privat, Sunshine),
-  dadurch halb so hoch und passend für Laptop-Bildschirme. Bei kleinen Bildschirmen wird gescrollt.
+- Updater: zweispaltiges Fenster, passt auf Laptop-Bildschirme.
 
 ## 0.6.0
 
-- Neu: „An C3 TV senden“ – Links vom iPhone (Teilen-Menü, App „Kurzbefehle“) öffnen sich
-  direkt in Silk auf dem TV. Nur aktiv, solange „Privat“ an ist; geschützt durch einen
-  geheimen Code; keine Speicherung gesendeter Links.
-- TV ist im Heimnetz als `c3tv.local` erreichbar (IP-Wechsel egal); Ersatzseite unter
-  `http://c3tv.local:8765` zum Einfügen eines Links von jedem Gerät.
-- Updater: „iPhone einrichten“ mit Schritt-für-Schritt-Anleitung, Adresse und Code zum
-  Kopieren; „Neuen Code erzeugen“. Fertige Beschreibung für „Änderung beschreiben“ in
-  „Kurzbefehle“ (neuere iOS-Versionen bauen den Kurzbefehl daraus selbst).
-- Diagnose-Seite zeigt, ob der Link-Empfang aktiv ist.
+- „An C3 TV senden“: Links vom iPhone (Kurzbefehl) öffnen sich am TV, nur bei „Privat an“, mit Code geschützt.
+- TV im Heimnetz als `c3tv.local` erreichbar. Updater: „iPhone einrichten“.
 
 ## 0.5.0
 
-- TV: neue Reihe „Web“ mit Browser-Kachel (Amazon Silk).
-- TV: privater Bereich – Reihe „Privat“ mit eigenen Seiten, nur sichtbar, wenn im Updater eingeschaltet.
-  Ausgeschaltet speichert der TV nichts davon.
-- TV: Reihen scrollen senkrecht, Titelbereich und Systemleiste bleiben fest.
-- Updater: Karte „Privat“ – Seiten verwalten (auf dem PC verschlüsselt gespeichert),
-  „Privat an“ (Silk aktivieren, Seiten senden), „Privat aus“ (Reihe entfernen,
-  Silk-Daten löschen, Silk deaktivieren; bei Systempaket nur Daten löschen).
-- Updater: Fenster passt sich an kleine/skalierte Bildschirme an (scrollt bei Bedarf).
+- TV: Browser-Kachel (Silk) und privater Bereich mit eigenen Seiten.
+- Updater: Karte „Privat“ (Seiten verschlüsselt, Privat an/aus).
 
 ## 0.4.0
 
-- Erste versionierte Ausgabe von C3 Television OS.
-- TV: C3 Home mit sechs Streaming-Apps, PlayStation 5 und HDMI-Eingängen im Vollbild,
-  C3 Desktop (direkter Moonlight-Stream), optionale Umleitung der Home-Taste.
-- TV: neues Design (Inter, Glas-Kacheln, Fokus mit Glanz, Titelbereich, Systemleiste).
-- Updater: neues Design, Geräte und PCs verwalten, Home-Taste umschalten,
-  Sunshine erkennen und installieren, Kanal „Stabil“ oder „Entwicklerversion“.
-- Release-ZIP `C3-TelevisionOS_vX.Y.Z.zip` mit Updater, APK, README und Changelog.
+- Erste versionierte Ausgabe: C3 Home mit Apps, PS5/HDMI, C3 Desktop, Home-Umleitung, neues Design.
+- Updater mit Geräten, PCs, Sunshine-Installation und Kanalwahl. Release-ZIP.

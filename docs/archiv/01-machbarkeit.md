@@ -268,7 +268,7 @@ Gradle-Module (`:core`, `:feature-*`) lohnen sich erst, wenn Build-Zeiten oder K
 4. Moonlight installieren, mit Sunshine koppeln, Latenz-Overlay ablesen (1080p60 und 4K60).
 
 ### Schritt 3 – Go/No-Go je Modul dokumentieren
-Ergebnisse in `docs/02-device-findings.md` eintragen; Status 🟡 → ✅/❌.
+Ergebnisse in `../02-device-findings.md` eintragen; Status 🟡 → ✅/❌.
 
 ### Schritt 4 – Prototyp P0 „C3 Home“ (erst nach Freigabe)
 - Ein APK, eine Activity, sechs App-Kacheln + Moonlight-Kachel + HDMI-Kacheln (falls Schritt 2 positiv).
