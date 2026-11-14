@@ -22,8 +22,8 @@ namespace C3
         readonly Pill tvPill = new Pill();
         readonly DarkCombo deviceBox = new DarkCombo();
         readonly RoundButton removeButton = new RoundButton();
-        readonly Field nameField = new Field("TV-Name");
-        readonly Field ipField = new Field("IP-Adresse");
+        readonly Field nameField = new Field("Name, z. B. Wohnzimmer");
+        readonly Field ipField = new Field("IP des TV, z. B. 192.168.178.23");
         readonly RoundButton saveButton = new RoundButton();
         readonly RoundButton updateButton = new RoundButton();
         readonly RoundButton startButton = new RoundButton();
@@ -35,8 +35,8 @@ namespace C3
         readonly Pill privatePill = new Pill();
         readonly DarkCombo siteBox = new DarkCombo();
         readonly RoundButton removeSiteButton = new RoundButton();
-        readonly Field siteNameField = new Field("Name");
-        readonly Field siteUrlField = new Field("Adresse");
+        readonly Field siteNameField = new Field("Name, z. B. Nachrichten");
+        readonly Field siteUrlField = new Field("Adresse, z. B. https://…");
         readonly RoundButton addSiteButton = new RoundButton();
         readonly RoundButton privateOnButton = new RoundButton();
         readonly RoundButton privateOffButton = new RoundButton();

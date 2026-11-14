@@ -207,9 +207,11 @@ namespace C3
     }
 
     /// Rounded dark field hosting a borderless TextBox.
+    /// Rounded text field with a grey hint ("Platzhalter") that disappears on click/focus.
     class Field : Panel
     {
         public readonly TextBox Box = new TextBox();
+        readonly Label hint = new Label();
 
         public Field(string cue)
         {
@@ -219,19 +221,45 @@ namespace C3
             Box.BackColor = Theme.Field;
             Box.ForeColor = Theme.Fg;
             Box.Font = Theme.Font(10f, false);
+
+            // The text box covers the panel, so the hint is a label on top of it.
+            hint.AutoSize = false;
+            hint.BackColor = Theme.Field;
+            hint.ForeColor = Theme.Muted;
+            hint.Font = Box.Font;
+            hint.TextAlign = ContentAlignment.MiddleLeft;
+            hint.AutoEllipsis = true;
+            hint.Cursor = Cursors.IBeam;
+            hint.Click += delegate { Box.Focus(); };
+
+            Controls.Add(hint);
             Controls.Add(Box);
+            hint.BringToFront();
             Cue = cue;
-            Box.GotFocus += delegate { Invalidate(); };
-            Box.LostFocus += delegate { Invalidate(); };
+            Box.GotFocus += delegate { UpdateHint(); Invalidate(); };
+            Box.LostFocus += delegate { UpdateHint(); Invalidate(); };
+            Box.TextChanged += delegate { UpdateHint(); };
+            EnabledChanged += delegate { UpdateHint(); };
         }
 
-        public string Cue;
+        public string Cue
+        {
+            get { return hint.Text; }
+            set { hint.Text = value ?? ""; UpdateHint(); }
+        }
+
+        void UpdateHint()
+        {
+            hint.Visible = Box.Text.Length == 0 && !Box.Focused && hint.Text.Length > 0;
+        }
 
         protected override void OnLayout(LayoutEventArgs e)
         {
             base.OnLayout(e);
             Box.Location = new Point(12, (Height - Box.PreferredHeight) / 2);
             Box.Width = Width - 24;
+            hint.Location = new Point(12, 2);
+            hint.Size = new Size(Width - 24, Height - 4);
         }
 
         protected override void OnPaint(PaintEventArgs e)
@@ -244,11 +272,6 @@ namespace C3
             {
                 e.Graphics.FillPath(brush, path);
                 e.Graphics.DrawPath(pen, path);
-            }
-            if (Box.Text.Length == 0 && !Box.Focused && !string.IsNullOrEmpty(Cue))
-            {
-                TextRenderer.DrawText(e.Graphics, Cue, Box.Font, new Rectangle(12, 0, Width - 24, Height), Theme.Muted,
-                    TextFormatFlags.VerticalCenter | TextFormatFlags.Left);
             }
         }
     }

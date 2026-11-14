@@ -2,6 +2,11 @@
 
 Nur die wesentlichen Änderungen. Version: Datei `VERSION` (x.y.z).
 
+## 0.6.4
+
+- Updater: Leere Eingabefelder zeigen einen grauen Hinweis, was hinein gehört
+  (z. B. „IP des TV, z. B. 192.168.178.23“). Der Hinweis verschwindet beim Hineinklicken.
+
 ## 0.6.3
 
 - TV: Die Reihe „Web“ mit der Browser-Kachel erscheint nur noch, solange „Privat“ an ist.
