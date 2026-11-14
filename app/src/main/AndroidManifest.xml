@@ -3,7 +3,8 @@
 
     <uses-feature android:name="android.software.leanback" android:required="false" />
 
-    <!-- "An C3 TV senden": local link receiver + c3tv.local name (only while Privat is on). -->
+    <!-- "An C3 TV senden": local link receiver + c3tv.local name (only while Privat is on).
+         INTERNET is also used for the PC online status (Sunshine serverinfo, local network only). -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />

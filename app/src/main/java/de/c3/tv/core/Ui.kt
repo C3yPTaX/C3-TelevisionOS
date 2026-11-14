@@ -79,6 +79,12 @@ class Tile(context: Context, val style: Style) : FrameLayout(context) {
 
     enum class Style { APP, DEVICE }
 
+    /** Stable id for focus memory and arrangement ("app:<pkg>", "pc:<uuid>", …). */
+    var key: String = ""
+
+    /** Colour of the light behind the title area while focused; null = no light. */
+    var glowColor: Int? = null
+
     /** Text for the large title area above the rows while this tile is focused. */
     var shelfCategory: String = ""
     var shelfTitle: String = ""
@@ -186,6 +192,17 @@ class Tile(context: Context, val style: Style) : FrameLayout(context) {
         image.visibility = View.VISIBLE
     }
 
+    /** Move mode of a favourite: accent ring instead of the focus ring. */
+    fun setMoving(moving: Boolean) {
+        foreground = context.getDrawable(
+            when {
+                moving -> R.drawable.focus_move
+                style == Style.APP -> R.drawable.focus_app
+                else -> R.drawable.focus_device
+            },
+        )
+    }
+
     fun setAvailable(available: Boolean) {
         this.available = available
         alpha = alphaFor(isFocused)
@@ -230,11 +247,13 @@ class DockButton(context: Context, label: String, iconRes: Int) : LinearLayout(c
         setPadding(h, v, h, v)
 
         val content = context.getColorStateList(R.color.dock_content)
-        addView(ImageView(context).apply {
-            setImageResource(iconRes)
-            imageTintList = content
-            isDuplicateParentStateEnabled = true
-        }, LayoutParams(context.dp(13), context.dp(13)).apply { marginEnd = context.dp(6) })
+        if (iconRes != 0) {
+            addView(ImageView(context).apply {
+                setImageResource(iconRes)
+                imageTintList = content
+                isDuplicateParentStateEnabled = true
+            }, LayoutParams(context.dp(13), context.dp(13)).apply { marginEnd = context.dp(6) })
+        }
         addView(TextView(context).apply {
             text = label
             textSize = 11f
@@ -244,5 +263,51 @@ class DockButton(context: Context, label: String, iconRes: Int) : LinearLayout(c
         })
 
         Focus.attach(this, 1.06f, 0f) { focused -> if (focused) onFocused?.invoke(this) }
+    }
+}
+
+/**
+ * Small options panel over the home screen (long press OK on a tile). Glass card with the
+ * tile's name and capsule buttons; Back closes it. The caller blocks focus behind it.
+ */
+class OptionsPanel(context: Context, title: String, options: List<Pair<String, () -> Unit>>, onClose: () -> Unit) :
+    FrameLayout(context) {
+
+    val firstButton: View
+
+    init {
+        setBackgroundColor(0x99000000.toInt())
+        isClickable = true // swallow touches behind the panel
+        val card = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundResource(R.drawable.panel_bg)
+            val p = context.dp(14)
+            setPadding(p, context.dp(12), p, p)
+            clipChildren = false
+            clipToPadding = false
+        }
+        card.addView(TextView(context).apply {
+            text = title
+            textSize = 13f
+            typeface = C3Fonts.semibold(context)
+            setTextColor(context.getColor(R.color.c3_text))
+            maxLines = 1
+            setPadding(context.dp(4), 0, context.dp(4), context.dp(8))
+        })
+        val buttons = options.map { (label, action) ->
+            DockButton(context, label, 0).apply {
+                setOnClickListener {
+                    onClose()
+                    action()
+                }
+            }
+        }
+        buttons.forEach { b ->
+            card.addView(b, LinearLayout.LayoutParams(context.dp(220), ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                topMargin = context.dp(4)
+            })
+        }
+        firstButton = buttons.first()
+        addView(card, LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER))
     }
 }
