@@ -10,7 +10,8 @@ Nur die wesentlichen Änderungen. Version: Datei `VERSION` (x.y.z).
 - TV ist im Heimnetz als `c3tv.local` erreichbar (IP-Wechsel egal); Ersatzseite unter
   `http://c3tv.local:8765` zum Einfügen eines Links von jedem Gerät.
 - Updater: „iPhone einrichten“ mit Schritt-für-Schritt-Anleitung, Adresse und Code zum
-  Kopieren; „Neuen Code erzeugen“.
+  Kopieren; „Neuen Code erzeugen“. Fertige Beschreibung für „Änderung beschreiben“ in
+  „Kurzbefehle“ (neuere iOS-Versionen bauen den Kurzbefehl daraus selbst).
 - Diagnose-Seite zeigt, ob der Link-Empfang aktiv ist.
 
 ## 0.5.0

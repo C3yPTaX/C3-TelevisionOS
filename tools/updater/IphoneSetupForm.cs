@@ -12,6 +12,7 @@ namespace C3
     {
         const int W = 600;
         readonly TextBox codeBox;
+        readonly TextBox promptBox;
         readonly Func<string> regenerate;
 
         public IphoneSetupForm(string token, string tvIp, Func<string> regenerate)
@@ -45,36 +46,41 @@ namespace C3
             y = AddValue("Header-Name", "X-C3-Token", y);
             codeBox = AddValueBox("Code (geheim halten)", token, ref y);
 
+            promptBox = AddValueBox("Beschreibung für „Kurzbefehle“ (enthält den Code)", Prompt(token), ref y);
+
             var steps = new Label
             {
                 Text =
-                    "1.  App „Kurzbefehle“ öffnen → „+“ → Name: „An C3 TV senden“.\n" +
-                    "2.  Unten „i“ (Details) → „Im Share-Sheet anzeigen“ einschalten.\n" +
-                    "     Bei „Erhält“ nur „URLs“ und „Safari-Webseiten“ auswählen.\n" +
-                    "3.  Aktion „Inhalte von URL abrufen“ hinzufügen:\n" +
-                    "     • URL: Adresse von oben einfügen\n" +
-                    "     • Methode: POST\n" +
-                    "     • Header: Feld hinzufügen → Name „X-C3-Token“, Wert = Code\n" +
-                    "     • Anfragetext: JSON → Feld hinzufügen → Text, Schlüssel „url“,\n" +
-                    "       Wert = Variable „Kurzbefehleingabe“\n" +
-                    "4.  Optional: Aktion „Mitteilung anzeigen“ – „Am TV geöffnet“.\n" +
-                    "5.  In Safari: Teilen → „An C3 TV senden“. Beim ersten Mal den Zugriff\n" +
-                    "     auf das lokale Netzwerk erlauben.",
+                    "Schnell (neuere iOS-Versionen): App „Kurzbefehle“ → „+“ → unten in\n" +
+                    "„Änderung beschreiben“ die Beschreibung von oben einfügen. Danach prüfen:\n\n" +
+                    "Von Hand oder zum Prüfen:\n" +
+                    "1.  Aktion „Inhalte von URL abrufen“: URL = Adresse von oben,\n" +
+                    "     Methode POST, Header „X-C3-Token“ = Code,\n" +
+                    "     Haupttext JSON → Feld „Text“, Schlüssel „url“, Wert = Variable\n" +
+                    "     „Kurzbefehleingabe“ (blau, nicht abtippen).\n" +
+                    "2.  Oberster Block „… von Nirgendwo erhalten“: „Nirgendwo“ antippen\n" +
+                    "     → „Share-Sheet“. Bei „Apps und … weitere“ nur URLs und\n" +
+                    "     Safari-Webseiten auswählen.\n" +
+                    "3.  Optional: „Mitteilung anzeigen“ mit „Inhalt der URL“.\n" +
+                    "4.  Safari: Teilen → Kurzbefehl. Beim ersten Mal den Zugriff auf das\n" +
+                    "     lokale Netzwerk erlauben. Antwort {\"ok\":true} = geöffnet.\n\n" +
+                    "Der Code bleibt gleich, auch nach „Privat aus/an“ – nur einmal eintragen.",
                 ForeColor = Theme.Fg,
                 Font = Theme.Font(9.5f, false),
                 AutoSize = false,
-                Size = new Size(W - 48, 230),
+                Size = new Size(W - 48, 290),
                 Location = new Point(24, y + 6),
                 BackColor = Theme.Bg,
             };
             Controls.Add(steps);
-            y += 246;
+            y += 306;
 
             var renew = new RoundButton { Text = "Neuen Code erzeugen", Location = new Point(24, y), Size = new Size(260, 36) };
             renew.Click += delegate
             {
                 if (MessageBox.Show(this, "Der alte Code funktioniert danach nicht mehr. Fortfahren?", "C3 Updater", MessageBoxButtons.YesNo) != DialogResult.Yes) return;
                 codeBox.Text = this.regenerate();
+                promptBox.Text = Prompt(codeBox.Text);
                 MessageBox.Show(this, "Neuer Code erzeugt. Im Updater „Privat an“ klicken und den Code im Kurzbefehl ersetzen.", "C3 Updater");
             };
             var close = new RoundButton { Text = "Fertig", Primary = true, Location = new Point(W - 24 - 160, y), Size = new Size(160, 36) };
@@ -91,6 +97,14 @@ namespace C3
         {
             base.OnHandleCreated(e);
             Theme.DarkTitleBar(Handle);
+        }
+
+        static string Prompt(string token)
+        {
+            return "Der Kurzbefehl soll im Share-Sheet erscheinen und nur URLs und Safari-Webseiten als Eingabe annehmen. " +
+                "Er soll eine Aktion \"Inhalte von URL abrufen\" haben mit: URL http://c3tv.local:8765/open, Methode POST, " +
+                "einem Header mit dem Schlüssel X-C3-Token und dem Wert " + token + ", und als Haupttext JSON mit genau einem " +
+                "Textfeld, Schlüssel url, Wert ist die Kurzbefehleingabe. Danach das Ergebnis der Anfrage als Mitteilung anzeigen.";
         }
 
         int AddValue(string label, string value, int y)
