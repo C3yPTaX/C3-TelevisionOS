@@ -2,6 +2,13 @@
 
 Nur die wesentlichen Änderungen. Version: Datei `VERSION` (x.y.z).
 
+## 0.6.2
+
+- TV: Beim Wechsel in untere Reihen (Geräte, Web) schoben sich die Reihen über den großen
+  Titel und unten über den Bildschirmrand. Der Reihenbereich wird jetzt sauber abgeschnitten.
+- TV: Kopfbereich und Abstände kompakter, damit Apps, Geräte und Web ohne Scrollen auf den
+  Bildschirm passen. Mit eingeschaltetem „Privat“ scrollt die Seite wie vorgesehen.
+
 ## 0.6.1
 
 - Updater: Fenster zweispaltig (links Fernseher, Home-Taste, PCs; rechts Privat, Sunshine),

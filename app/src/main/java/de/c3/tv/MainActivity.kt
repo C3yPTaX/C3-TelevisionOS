@@ -152,10 +152,12 @@ class MainActivity : Activity() {
             orientation = LinearLayout.VERTICAL
             clipChildren = false
             clipToPadding = false
-            setPadding(dp(12), dp(2), dp(12), dp(10))
+            setPadding(dp(12), 0, dp(12), dp(2))
         }
-        // The scroll view itself clips (rows must not paint over the title area when scrolled);
-        // padding inside leaves room for the focus scale.
+        // Rows must not paint over the title area or the dock when scrolled. A view's content is
+        // only clipped to its bounds if its *parent* clips children – `column` does not (focus
+        // scale), so the scroll view sits in its own clipping frame. Padding inside the rows
+        // leaves room for the focus scale.
         val rowScroll = ScrollView(this).apply {
             isVerticalScrollBarEnabled = false
             isFocusable = false
@@ -163,10 +165,15 @@ class MainActivity : Activity() {
             isSmoothScrollingEnabled = true
             addView(rows)
         }
-        column.addView(rowScroll, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f).apply {
+        val rowClip = FrameLayout(this).apply {
+            clipChildren = true
+            addView(rowScroll, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        }
+        // 960×540 dp: header + shelf + Apps/Geräte/Web fit without scrolling; ends above the dock.
+        column.addView(rowClip, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f).apply {
             leftMargin = -dp(12)
             rightMargin = -dp(12)
-            bottomMargin = dp(48)
+            bottomMargin = dp(44)
         })
 
         rows.addView(sectionTitle("Apps"))
@@ -255,7 +262,7 @@ class MainActivity : Activity() {
     private fun buildShelf(): View = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
         gravity = Gravity.BOTTOM
-        layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(100))
+        layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(66))
         shelfCategory = TextView(context).apply {
             textSize = 11f
             typeface = C3Fonts.medium(context)
@@ -271,8 +278,8 @@ class MainActivity : Activity() {
         }
         addView(shelfCategory)
         addView(shelfTitle, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
-            topMargin = dp(4)
-            bottomMargin = dp(6)
+            topMargin = dp(3)
+            bottomMargin = dp(4)
         })
     }
 
@@ -320,7 +327,7 @@ class MainActivity : Activity() {
         textSize = 12f
         typeface = C3Fonts.semibold(context)
         setTextColor(getColor(R.color.c3_text_secondary))
-        setPadding(0, dp(12), 0, dp(8))
+        setPadding(0, dp(4), 0, dp(3))
     }
 
     private fun row(tiles: List<View>): View {
