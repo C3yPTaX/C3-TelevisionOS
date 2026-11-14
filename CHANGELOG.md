@@ -2,6 +2,12 @@
 
 Nur die wesentlichen Änderungen. Version: Datei `VERSION` (x.y.z).
 
+## 0.6.5
+
+- Updater: aktualisiert sich jetzt selbst. Der Link „Updater aktualisieren“ unten lädt die
+  neue EXE aus dem gewählten Kanal (stabil oder Entwicklerversion), ersetzt die laufende und
+  startet neu. Gibt es eine neuere Version, zeigt der Link das beim Start grün an.
+
 ## 0.6.4
 
 - Updater: Leere Eingabefelder zeigen einen grauen Hinweis, was hinein gehört
